@@ -1,13 +1,13 @@
 # jupyterlab-a11y-checker
 This tool performs multiple accessibility checks on Jupyter notebook/Lab cells containing images and headings. It verifies the presence of alt-text for images, ensuring that visually impaired users can understand their content. Additionally, it calculates the color contrast ratio to ensure readability for users with low vision and identifies any transparency issues in images. Furthermore, it evaluates the heading structure to align with WCAG standards, ensuring that headers (h1, h2, etc.) are appropriately structured for optimal accessibility.
 
-## Check for the presence of alt-text in images
+## Check for the presence of alt-text in cells containing images
 WCAG 2.0/2.1 Guideline 1.1.1: Provide text alternatives for any non-text content so that it can be changed into other forms people need, such as large print, braille, speech, symbols or simpler language.
 
 ![alt-checker](https://github.com/berkeley-dsep-infra/jupyterlab-a11y-checker/assets/8241358/c3100644-9bb7-4c87-b5c7-7aff84d3be23)
 Upon activating the a11y-cell-checker button, any cells that contain images lacking alt text, in accordance with guideline 1.1.1, are distinctly marked with a dark red circle on the left. This visual indicator underscores the accessibility (a11y) issue that needs to be addressed.
 
-## Check for the header structure
+## Check for the header structure in jupyter notebooks
 WCAG 2.0/2.1 Guideline 2.4: Provide ways to help users navigate, find content, and determine where they are.
 
 ![headings](https://github.com/berkeley-dsep-infra/jupyterlab-a11y-checker/assets/8241358/5088ecb3-52a6-4a2d-94a8-3515f3c01a71")
