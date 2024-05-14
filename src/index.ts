@@ -42,7 +42,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         }
       }
 
-      console.log("Extracted Headings with Cell IDs:", headingsMap);
+      // console.log("Extracted Headings with Cell IDs:", headingsMap);
       
       if (headingsMap.length > 0){
         let previousLevel = headingsMap[0].headingLevel;
@@ -218,7 +218,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   const indicatorId = 'accessibility-indicator-' + cell.model.id;
   altCellList.removeCell(cell.model.id);
   let applyIndic = false;
-  
+
   for (let i = 0; i < listIssues.length; i++) {
 
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
@@ -410,8 +410,20 @@ class AltCellList extends Widget {
     dropdown.style.padding = '5px';
     
     const link = document.createElement('a');
-    link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
-    link.textContent = "WCAG transparency guidelines";
+    if (buttonContent.includes("Transparency")){
+      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
+      link.textContent = "WCAG transparency guidelines";
+    } else if(buttonContent.includes("Heading")){
+      link.href = "https://www.w3.org/WAI/tutorials/page-structure/headings/";
+      link.textContent = "WCAG headings guidelines";
+    } else if(buttonContent.includes("Alt")){
+      link.href = "https://www.w3.org/TR/WCAG20-TECHS/H37.html";
+      link.textContent = "WCAG alt-text guidelines";
+    } else if(buttonContent.includes("Contrast")){
+      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
+      link.textContent = "WCAG contrast guidelines";
+    }
+    
     link.target = "_blank";
     dropdown.appendChild(link);
 
@@ -441,9 +453,7 @@ class AltCellList extends Widget {
       listItem.appendChild(button);
       listItem.appendChild(infoIcon);
       listItem.appendChild(dropdown);
-      console.log(this._listCells.appendChild(listItem));
-      console.log("adding button: " + listItem.outerHTML.toString() + " " + add)
-      console.log(this._listCells);
+      this._listCells.appendChild(listItem);
     }
   }
 
