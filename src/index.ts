@@ -6,11 +6,77 @@ import {
 
 import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
 import { ToolbarButton } from '@jupyterlab/apputils';
-import { MarkdownCell, ICellModel, Cell, CodeCell } from '@jupyterlab/cells';
 import { IDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
 import { LabIcon } from '@jupyterlab/ui-components';
 
+async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
+  const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
+
+  notebookContent.widgets.forEach(async cell => {
+    if (isEnabled()){
+      //Image transparency, contrast, and alt checking
+      const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
+      const codeCellHasTransparency = await checkCodeCellForImageWithTransparency(cell, myPath);
+      var issues = mdCellIssues.concat(codeCellHasTransparency);
+      applyVisualIndicator(altCellList, cell, issues);
+
+      //header ordering checking
+      if (cell.model.type === 'markdown') {
+        const mCell = cell as MarkdownCell;
+
+        const cellText = mCell.model.toJSON().source.toString();
+        const markdownHeadingRegex = /^(#+) \s*(.*)$/gm;
+        const htmlHeadingRegex = /<h(\d+)>(.*?)<\/h\1>/gi;
+
+        let match;
+        while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
+          const level = match[1].length;  // The level is determined by the number of '#'
+          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell});
+        }
+
+        while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
+          const level = parseInt(match[1]);  // The level is directly captured by the regex
+          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
+        }
+      }
+
+      console.log("Extracted Headings with Cell IDs:", headingsMap);
+      
+      if (headingsMap.length > 0){
+        let previousLevel = headingsMap[0].headingLevel;
+        let highestLevel = previousLevel;
+        const errors: Array<{myCell: Cell, current: string, expected: string}> = [];
+  
+        headingsMap.forEach((heading, index) => {
+          if (heading.headingLevel > previousLevel + 1) {
+            // If the current heading level skips more than one level
+            errors.push({
+              myCell: heading.myCell,
+              current: `h${heading.headingLevel}`,
+              expected: `h${previousLevel + 1}`
+            });
+          } else if (heading.headingLevel < highestLevel){
+            //if the header is higher than the first ever header
+            errors.push({
+              myCell: heading.myCell,
+              current: `h${heading.headingLevel}`,
+              expected: `h${highestLevel}`
+            });
+          }
+  
+          previousLevel = heading.headingLevel;
+        });
+  
+        errors.forEach(e => {
+          applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
+        });
+      } else {
+        applyVisualIndicator(altCellList, cell, []);
+      }
+     });
+  }
+      
 function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -138,23 +204,7 @@ async function checkCodeCellForImageWithTransparency(cell: Cell, myPath: string)
   }
 }
 
-
-function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
-  notebookContent.widgets.forEach(async cell => {
-    if (isEnabled()){
-      //Image transparency, contrast, and alt checking
-      const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
-      const codeCellHasTransparency = await checkCodeCellForImageWithTransparency(cell, myPath);
-      var issues = mdCellIssues.concat(codeCellHasTransparency);
-      console.log("check all cellhlhlilhlhls");
-      applyVisualIndicator(altCellList, cell, issues);
-    } else {
-      applyVisualIndicator(altCellList, cell, []);
-    }
-  });
-}
-
-function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
+async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
   //for each existing cell, attach a content changed listener
   cell.model.contentChanged.connect(async (sender, args) => {
     await checkAllCells(notebookContent, altCellList, isEnabled, myPath);
@@ -164,11 +214,14 @@ function attachContentChangedListener(notebookContent: Notebook, altCellList: Al
 
 function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: string[]) {
   const indicatorId = 'accessibility-indicator-' + cell.model.id;
-  altCellList.removeCell(cell.model.id);
 
   let applyIndic = false;
   for (let i = 0; i < listIssues.length; i++) {
-    if (listIssues[i] == "Alt") {
+
+    if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
+      altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
+      applyIndic = true;
+    } else if (listIssues[i] == "Alt") {
       altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
       applyIndic = true;
     } else {
@@ -179,9 +232,9 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       }
     }
   }
+  altCellList.removeCell(cell.model.id);
   
   if (applyIndic) {
-
     if (!document.getElementById(indicatorId)) {
       let indicator = document.createElement('div');
       indicator.id = indicatorId;
@@ -276,10 +329,10 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
           //for each existing cell, attach a content changed listener
           content.widgets.forEach(async cell => {
-            attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);            
+            attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);
           });
 
-          checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path);
+          checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path)
 
           //every time a cell is added, attach a content listener to it
           if (content.model) {
@@ -323,6 +376,7 @@ class AltCellList extends Widget {
   }
 
   addCell(cellId: string, buttonContent: string): void {
+
     const listItem = document.createElement('div');
     listItem.id = 'cell-' + cellId + "_" + buttonContent;
 
@@ -431,5 +485,4 @@ class AltCellList extends Widget {
   }
   
 }
-
 export default plugin;
