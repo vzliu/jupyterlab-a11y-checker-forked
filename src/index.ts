@@ -9,6 +9,7 @@ import { ToolbarButton } from '@jupyterlab/apputils';
 import { IDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
 import { LabIcon } from '@jupyterlab/ui-components';
+import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
   const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
@@ -71,11 +72,12 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         errors.forEach(e => {
           applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
         });
-      } else {
-        applyVisualIndicator(altCellList, cell, []);
       }
-     });
-  }
+    } else {
+      applyVisualIndicator(altCellList, cell, []);
+    }
+  });
+}
       
 function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
   return new Promise((resolve, reject) => {
@@ -214,8 +216,9 @@ async function attachContentChangedListener(notebookContent: Notebook, altCellLi
 
 function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: string[]) {
   const indicatorId = 'accessibility-indicator-' + cell.model.id;
-
+  altCellList.removeCell(cell.model.id);
   let applyIndic = false;
+  
   for (let i = 0; i < listIssues.length; i++) {
 
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
@@ -232,7 +235,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       }
     }
   }
-  altCellList.removeCell(cell.model.id);
+  
   
   if (applyIndic) {
     if (!document.getElementById(indicatorId)) {
@@ -376,7 +379,6 @@ class AltCellList extends Widget {
   }
 
   addCell(cellId: string, buttonContent: string): void {
-
     const listItem = document.createElement('div');
     listItem.id = 'cell-' + cellId + "_" + buttonContent;
 
@@ -421,9 +423,7 @@ class AltCellList extends Widget {
     var add = true;
 
     if (this._cellMap.has(cellId)){
-      
       var existingList = this._cellMap.get(cellId)
-
       existingList!.forEach(b => {          
         if (b.textContent == buttonContent) {
           add = false;
@@ -436,11 +436,14 @@ class AltCellList extends Widget {
       this._cellMap.set(cellId, [listItem]);
     }
 
+    
     if (add) {
       listItem.appendChild(button);
       listItem.appendChild(infoIcon);
       listItem.appendChild(dropdown);
-      this._listCells.appendChild(listItem);
+      console.log(this._listCells.appendChild(listItem));
+      console.log("adding button: " + listItem.outerHTML.toString() + " " + add)
+      console.log(this._listCells);
     }
   }
 
