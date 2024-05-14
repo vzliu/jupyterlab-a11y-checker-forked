@@ -1,18 +1,64 @@
 import {
-  ILabShell,
-  JupyterFrontEnd,
-  JupyterFrontEndPlugin
-} from '@jupyterlab/application';
-
-import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
-import { ToolbarButton } from '@jupyterlab/apputils';
-import { MarkdownCell, ICellModel, Cell } from '@jupyterlab/cells';
-import { IDisposable } from '@lumino/disposable';
-import { Widget } from '@lumino/widgets';
-import { LabIcon } from '@jupyterlab/ui-components';
-
-async function checkHtmlNoAlt(htmlString: string, myPath: string, isCodeCellOutput: boolean, cellColor: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
+    ILabShell,
+    JupyterFrontEnd,
+    JupyterFrontEndPlugin
+  } from '@jupyterlab/application';
+  
+  import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
+  import { ToolbarButton } from '@jupyterlab/apputils';
+  import { MarkdownCell, ICellModel, CodeCell, Cell } from '@jupyterlab/cells';
+  import { IDisposable } from '@lumino/disposable';
+  import { Widget } from '@lumino/widgets';
+  import { LabIcon } from '@jupyterlab/ui-components';
+  
+  function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous'; // Needed for CORS-compliant images
+  
+      try {
+        new URL(imgString);
+        img.src = imgString;
+      } catch (_) {
+        const baseUrl = document.location.origin;
+        var finalPath = `${baseUrl}/files/${imgString}`
+        img.src = finalPath;
+      }
+  
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+  
+        const context = canvas.getContext('2d');
+        if (!context) {
+          console.log('Failed to get canvas context');
+          resolve(10 + " transp");
+          return;
+        }
+  
+        context.drawImage(img, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+  
+        let transparentPixelCount = 0;
+        const totalPixels = data.length / 4;
+  
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 255) {
+            transparentPixelCount++;
+          }
+        }
+  
+        const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;      
+        resolve((10 - transparencyPercentage/10) + " transp");
+      };
+  
+      img.onerror = () => reject('Failed to load image');
+    });
+  }
+  
+  async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, isCodeCellOutput: boolean, cellColor: string): Promise<string[]> {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, "text/html");
     const images = doc.querySelectorAll("img");
@@ -26,14 +72,17 @@ async function checkHtmlNoAlt(htmlString: string, myPath: string, isCodeCellOutp
         }
       }
     }
+    
+    const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
+    const transparency = await Promise.all(transparencyPromises);
   
-    accessibilityTests = [...accessibilityTests];
-  
+    accessibilityTests = [...accessibilityTests, ...transparency.map(String)];
+    
     resolve(accessibilityTests);
   });
 }
 
-async function checkMDNoAlt(mdString: string, myPath: string, cellColor: string): Promise<string[]> {
+async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const imageNoAltRegex = /!\[\](\([^)]+\))/g;
     const allImagesRegex = /!\[.*?\]\((.*?)\)/g;
@@ -52,12 +101,14 @@ async function checkMDNoAlt(mdString: string, myPath: string, cellColor: string)
     if (imageNoAltRegex.test(mdString)){
       accessibilityTests.push("Alt");
     }
-
-    accessibilityTests = [...accessibilityTests];
+    
+    const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
+    const transparency = await Promise.all(transparencyPromises);
+  
+    accessibilityTests = [...accessibilityTests, ...transparency.map(String)];
   
     resolve(accessibilityTests);
   });
-  
 }
 
 async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
