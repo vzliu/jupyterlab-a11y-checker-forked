@@ -1,64 +1,65 @@
 import {
-    ILabShell,
-    JupyterFrontEnd,
-    JupyterFrontEndPlugin
-  } from '@jupyterlab/application';
-  
-  import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
-  import { ToolbarButton } from '@jupyterlab/apputils';
-  import { MarkdownCell, ICellModel, CodeCell, Cell } from '@jupyterlab/cells';
-  import { IDisposable } from '@lumino/disposable';
-  import { Widget } from '@lumino/widgets';
-  import { LabIcon } from '@jupyterlab/ui-components';
-  
-  function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous'; // Needed for CORS-compliant images
-  
-      try {
-        new URL(imgString);
-        img.src = imgString;
-      } catch (_) {
-        const baseUrl = document.location.origin;
-        var finalPath = `${baseUrl}/files/${imgString}`
-        img.src = finalPath;
+  ILabShell,
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin
+} from '@jupyterlab/application';
+
+import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
+import { ToolbarButton } from '@jupyterlab/apputils';
+import { MarkdownCell, ICellModel, Cell, CodeCell } from '@jupyterlab/cells';
+import { IDisposable } from '@lumino/disposable';
+import { Widget } from '@lumino/widgets';
+import { LabIcon } from '@jupyterlab/ui-components';
+
+function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // Needed for CORS-compliant images
+
+    try {
+      new URL(imgString);
+      img.src = imgString;
+    } catch (_) {
+      const baseUrl = document.location.origin;
+      var finalPath = `${baseUrl}/files/${imgString}`
+      img.src = finalPath;
+    }
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+
+      const context = canvas.getContext('2d');
+      if (!context) {
+        console.log('Failed to get canvas context');
+        resolve(10 + " transp");
+        return;
       }
-  
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-  
-        const context = canvas.getContext('2d');
-        if (!context) {
-          console.log('Failed to get canvas context');
-          resolve(10 + " transp");
-          return;
+
+      context.drawImage(img, 0, 0);
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      let transparentPixelCount = 0;
+      const totalPixels = data.length / 4;
+
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 255) {
+          transparentPixelCount++;
         }
-  
-        context.drawImage(img, 0, 0);
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-  
-        let transparentPixelCount = 0;
-        const totalPixels = data.length / 4;
-  
-        for (let i = 3; i < data.length; i += 4) {
-          if (data[i] < 255) {
-            transparentPixelCount++;
-          }
-        }
-  
-        const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;      
-        resolve((10 - transparencyPercentage/10) + " transp");
-      };
-  
-      img.onerror = () => reject('Failed to load image');
-    });
-  }
-  
-  async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, isCodeCellOutput: boolean, cellColor: string): Promise<string[]> {
+      }
+
+      const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;      
+      resolve((10 - transparencyPercentage/10) + " transp");
+    };
+
+    img.onerror = () => reject('Failed to load image');
+  });
+}
+
+async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, isCodeCellOutput: boolean, cellColor: string): Promise<string[]> {
+  return new Promise(async (resolve, reject) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, "text/html");
     const images = doc.querySelectorAll("img");
@@ -83,7 +84,7 @@ import {
 }
 
 async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor: string): Promise<string[]> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const imageNoAltRegex = /!\[\](\([^)]+\))/g;
     const allImagesRegex = /!\[.*?\]\((.*?)\)/g;
     let accessibilityTests: string[] = [];
@@ -102,7 +103,7 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
       accessibilityTests.push("Alt");
     }
     
-    const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
+    const transparencyPromises = Array.from(imageUrls).map((i: string) => getImageTransparency(i, myPath));
     const transparency = await Promise.all(transparencyPromises);
   
     accessibilityTests = [...accessibilityTests, ...transparency.map(String)];
@@ -116,10 +117,22 @@ async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string)
     cell = cell as MarkdownCell;
     const cellText = cell.model.toJSON().source.toString();
     
-    const markdownNoAlt = await checkMDNoAlt(cellText, myPath, window.getComputedStyle(cell.node).backgroundColor);
-    const htmlNoAlt = await checkHtmlNoAlt(cellText, myPath, false, window.getComputedStyle(cell.node).backgroundColor);
+    const markdownNoAlt = await checkMDNoAccessIssues(cellText, myPath, window.getComputedStyle(cell.node).backgroundColor);
+    const htmlNoAlt = await checkHtmlNoAccessIssues(cellText, myPath, false, window.getComputedStyle(cell.node).backgroundColor);
     var issues = htmlNoAlt.concat(markdownNoAlt)
     return issues;
+  } else {
+    return [];
+  }
+}
+
+async function checkCodeCellForImageWithTransparency(cell: Cell, myPath: string): Promise<string[]> {
+  if(cell.model.type == 'code'){
+    const codeCell = cell as CodeCell;
+    const outputText = codeCell.outputArea.node.outerHTML;
+
+    const htmlTransparancyIssues = await checkHtmlNoAccessIssues(outputText, myPath, true, window.getComputedStyle(cell.node).backgroundColor);
+    return htmlTransparancyIssues;
   } else {
     return [];
   }
@@ -131,7 +144,9 @@ function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEn
     if (isEnabled()){
       //Image transparency, contrast, and alt checking
       const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
-      var issues = mdCellIssues
+      const codeCellHasTransparency = await checkCodeCellForImageWithTransparency(cell, myPath);
+      var issues = mdCellIssues.concat(codeCellHasTransparency);
+      console.log("check all cellhlhlilhlhls");
       applyVisualIndicator(altCellList, cell, issues);
     } else {
       applyVisualIndicator(altCellList, cell, []);
@@ -156,6 +171,12 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
     if (listIssues[i] == "Alt") {
       altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
       applyIndic = true;
+    } else {
+      var score = Number(listIssues[i].split(" ")[0]);
+      if (score < 9) {
+        altCellList.addCell(cell.model.id, "Image Err: High (" + ((10-score)*10).toFixed(2) + "%) Image Transparency");
+        applyIndic = true;
+      }
     }
   }
   
@@ -302,48 +323,71 @@ class AltCellList extends Widget {
   }
 
   addCell(cellId: string, buttonContent: string): void {
-      const listItem = document.createElement('div');
-      listItem.id = 'cell-' + cellId + "_" + buttonContent;
+    const listItem = document.createElement('div');
+    listItem.id = 'cell-' + cellId + "_" + buttonContent;
 
-      const button = document.createElement('button');
-      button.classList.add("jp-toast-button");
-      button.classList.add("jp-mod-link");
-      button.classList.add("jp-mod-small");
-      button.classList.add("jp-Button");
-      button.style.margin = '5px';
-      button.style.marginRight = '15px';
-      button.style.marginLeft = '15px';
-      button.textContent = buttonContent;
+    const button = document.createElement('button');
+    button.classList.add("jp-toast-button");
+    button.classList.add("jp-mod-link");
+    button.classList.add("jp-mod-small");
+    button.classList.add("jp-Button");
+    button.style.margin = '5px';
+    button.style.marginRight = '5px';
+    button.style.marginLeft = '15px';
+    button.textContent = buttonContent;
 
-      button.addEventListener('click', () => {
-        this.scrollToCell(cellId);
-      });
+    button.addEventListener('click', () => {
+      this.scrollToCell(cellId);
+    });
 
+    //more information icon
+    const infoIcon = document.createElement('span');
+    infoIcon.innerHTML = '&#9432;';
+    infoIcon.style.cursor = 'pointer';
 
-      var add = true;
+    const dropdown = document.createElement('div');
+    dropdown.style.display = 'none';
+    dropdown.style.marginLeft = '50px';
+    dropdown.style.marginRight = '50px';
+    dropdown.style.backgroundColor = 'white';
+    dropdown.style.border = '1px solid black';
+    dropdown.style.padding = '5px';
+    
+    const link = document.createElement('a');
+    link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
+    link.textContent = "WCAG transparency guidelines";
+    link.target = "_blank";
+    dropdown.appendChild(link);
 
-      if (this._cellMap.has(cellId)){
-        
-        var existingList = this._cellMap.get(cellId)
+    // Toggle dropdown on info icon click
+    infoIcon.addEventListener('click', () => {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
 
-        existingList!.forEach(b => {          
-          if (b.textContent == buttonContent) {
-            add = false;
-          }
-        })
+    var add = true;
 
-        existingList!.push(listItem)
-        this._cellMap.set(cellId, existingList!);
-      } else {
-        this._cellMap.set(cellId, [listItem]);
-      }
-
-      if (add) {
-        listItem.appendChild(button);
-        this._listCells.appendChild(listItem);
-      }
+    if (this._cellMap.has(cellId)){
       
-      
+      var existingList = this._cellMap.get(cellId)
+
+      existingList!.forEach(b => {          
+        if (b.textContent == buttonContent) {
+          add = false;
+        }
+      })
+
+      existingList!.push(listItem)
+      this._cellMap.set(cellId, existingList!);
+    } else {
+      this._cellMap.set(cellId, [listItem]);
+    }
+
+    if (add) {
+      listItem.appendChild(button);
+      listItem.appendChild(infoIcon);
+      listItem.appendChild(dropdown);
+      this._listCells.appendChild(listItem);
+    }
   }
 
   removeCell(cellId: string): void {
