@@ -425,6 +425,8 @@ class AltCellList extends Widget {
       link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
       link.textContent = "WCAG contrast guidelines";
     }
+    link.style.color = "#069";
+    link.style.textDecoration = "underline";
     
     link.target = "_blank";
     dropdown.appendChild(link);
