@@ -77,6 +77,8 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
       applyVisualIndicator(altCellList, cell, []);
     }
   });
+
+  altCellList.showOnlyVisibleCells();
 }
       
 function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
@@ -264,7 +266,7 @@ async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, n
 
   const button = new ToolbarButton({
 
-    label: '🌐 Check Alt-Text',
+    label: '🌐 a11y Checker',
     onClick: () => {
       toggleEnabled();
       if(isEnabled()){
@@ -495,6 +497,26 @@ class AltCellList extends Widget {
         }, 800); // Flash duration
       }
     }
+  }
+
+  showOnlyVisibleCells(): void {
+    var keyList = Array.from(this._cellMap.keys());
+    const notebookPanel = this._notebookTracker.currentWidget;
+    const notebook = notebookPanel!.content;
+
+    keyList.forEach(k => {
+      var cellExists = false;
+      for (let i = 0; i < notebook.widgets.length; i++) {
+        const cell = notebook.widgets[i];
+        if (cell.model.id === k) {
+          cellExists = true;
+          break
+        }
+      }
+      if(!cellExists){
+        this.removeCell(k);
+      }
+    });
   }
   
 }
