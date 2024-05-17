@@ -232,7 +232,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
     } else {
       var score = Number(listIssues[i].split(" ")[0]);
       if (score < 9) {
-        altCellList.addCell(cell.model.id, "Image Err: High (" + ((10-score)*10).toFixed(2) + "%) Image Transparency");
+        altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
         applyIndic = true;
       }
     }
@@ -383,6 +383,9 @@ class AltCellList extends Widget {
   addCell(cellId: string, buttonContent: string): void {
     const listItem = document.createElement('div');
     listItem.id = 'cell-' + cellId + "_" + buttonContent;
+    listItem.style.display = 'flex';
+    listItem.style.alignItems = 'center';
+    listItem.style.flexWrap = 'nowrap';
 
     const button = document.createElement('button');
     button.classList.add("jp-toast-button");
@@ -391,8 +394,10 @@ class AltCellList extends Widget {
     button.classList.add("jp-Button");
     button.style.margin = '5px';
     button.style.marginRight = '5px';
-    button.style.marginLeft = '15px';
+    button.style.marginLeft = '7px';
+    button.style.flexShrink = '1';
     button.textContent = buttonContent;
+    
 
     button.addEventListener('click', () => {
       this.scrollToCell(cellId);
@@ -402,6 +407,7 @@ class AltCellList extends Widget {
     const infoIcon = document.createElement('span');
     infoIcon.innerHTML = '&#9432;';
     infoIcon.style.cursor = 'pointer';
+    infoIcon.style.marginRight = '5px';
 
     const dropdown = document.createElement('div');
     dropdown.style.display = 'none';
