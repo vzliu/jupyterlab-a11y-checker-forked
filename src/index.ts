@@ -18,7 +18,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
     if (isEnabled()){
       //Image transparency, contrast, and alt checking
       const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
-      const codeCellHasTransparency = await checkCodeCellForImageWithTransparency(cell, myPath);
+      const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
       var issues = mdCellIssues.concat(codeCellHasTransparency);
       applyVisualIndicator(altCellList, cell, issues);
 
@@ -135,14 +135,14 @@ async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, isCod
     const images = doc.querySelectorAll("img");
   
     let accessibilityTests: string[] = [];
-    if(!isCodeCellOutput){
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        if (!img.hasAttribute("alt") || img.getAttribute("alt") === "") {
-          accessibilityTests.push("Alt");
-        }
+    // if(!isCodeCellOutput){
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      if (!img.hasAttribute("alt") || img.getAttribute("alt") === "") {
+        accessibilityTests.push("Alt");
       }
     }
+    // }
     
     const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
     const transparency = await Promise.all(transparencyPromises);
@@ -196,13 +196,13 @@ async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string)
   }
 }
 
-async function checkCodeCellForImageWithTransparency(cell: Cell, myPath: string): Promise<string[]> {
+async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
   if(cell.model.type == 'code'){
     const codeCell = cell as CodeCell;
     const outputText = codeCell.outputArea.node.outerHTML;
 
-    const htmlTransparancyIssues = await checkHtmlNoAccessIssues(outputText, myPath, true, window.getComputedStyle(cell.node).backgroundColor);
-    return htmlTransparancyIssues;
+    const generatedOutputImageIssues = await checkHtmlNoAccessIssues(outputText, myPath, true, window.getComputedStyle(cell.node).backgroundColor);
+    return generatedOutputImageIssues;
   } else {
     return [];
   }
