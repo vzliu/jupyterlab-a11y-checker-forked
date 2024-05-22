@@ -10,6 +10,109 @@ import { IDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
 import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
+import ColorThief from 'colorthief';
+
+function hexToRgb(hex: string): { r: number, g: number, b: number } {
+  // Remove the leading hash if it's there
+  hex = hex.replace(/^#/, '');
+
+  // Parse the r, g, b values
+  let bigint = parseInt(hex, 16);
+  let r = (bigint >> 16) & 255;
+  let g = (bigint >> 8) & 255;
+  let b = bigint & 255;
+
+  return { r, g, b };
+}
+
+function luminance(r: number, g: number, b: number): number {
+  const a = [r, g, b].map(function (v) {
+      v /= 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+function contrastRatio(l1: number, l2: number): number {
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
+function normalizeContrast(contrast: number): number {
+  const maxContrast = 21; // Theoretical max contrast ratio
+  const scaledContrast = (contrast - 1) / (maxContrast - 1);
+  return scaledContrast * 20; // Scale to a 0-20 range
+}
+
+function calculateContrast(foregroundHex: string, backgroundHex: string): number {
+  const fgRgb = hexToRgb(foregroundHex);
+  const bgRgb = hexToRgb(backgroundHex);
+
+  const fgLuminance = luminance(fgRgb.r, fgRgb.g, fgRgb.b);
+  const bgLuminance = luminance(bgRgb.r, bgRgb.g, bgRgb.b);
+
+  const contrast = contrastRatio(fgLuminance, bgLuminance);
+  return normalizeContrast(contrast);
+}
+
+async function getImageContrast(imageSrc: string, notebookPath: string, cellColor: string, numClusters: number = 3): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // Needed if the image is served from a different domain
+    
+    try {
+      new URL(imageSrc);
+      img.src = imageSrc;
+    } catch (_) {
+      const baseUrl = document.location.origin;
+      var finalPath = `${baseUrl}/files/${imageSrc}`
+      // console.log(finalPath);
+      img.src = finalPath;
+    }
+
+    img.onload = () => {
+      const colorThief = new ColorThief();
+      // const dominantColor = colorThief.getColor(img); // Gets the dominant color
+
+      const p = colorThief.getPalette(img, 3); // Get top 3 dominant colors
+      let palette: string[] = [];
+      p.forEach(c => {
+        var col = "#" + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase();
+        palette.push(col)
+      })
+      console.log('Color Palette:', palette);
+
+      var highestContrast = -1;
+      var colorHighestContrast = "";
+
+      // console.log(cellColor);
+
+      let contrast = calculateContrast(palette[0], cellColor);
+      if (contrast > highestContrast){
+        // console.log("step 1");
+        highestContrast = contrast;
+        colorHighestContrast = palette[0]
+      }
+      contrast = calculateContrast(palette[1], cellColor);
+      if (contrast > highestContrast){
+        // console.log("step 2");
+        highestContrast = contrast;
+        colorHighestContrast = palette[1]
+      }
+      contrast = calculateContrast(palette[2], cellColor);
+      if (contrast > highestContrast){
+        // console.log("step 3");
+        highestContrast = contrast;
+        colorHighestContrast = palette[2]
+      }
+
+      // console.log(`Dominant Color: ${colorHighestContrast} vs cell color: ${cellColor}. Contrast: ${highestContrast}`);
+      resolve(`${highestContrast} contrast ${colorHighestContrast}`);
+
+    };
+
+    img.onerror = () => reject('Failed to load image');
+  });
+}
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
   const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
@@ -78,7 +181,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
     }
   });
 
-  altCellList.showOnlyVisibleCells();
+  // altCellList.showOnlyVisibleCells();
 }
       
 function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
@@ -128,26 +231,27 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
   });
 }
 
-async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, isCodeCellOutput: boolean, cellColor: string): Promise<string[]> {
+async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, cellColor: string): Promise<string[]> {
   return new Promise(async (resolve, reject) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, "text/html");
     const images = doc.querySelectorAll("img");
   
     let accessibilityTests: string[] = [];
-    // if(!isCodeCellOutput){
     for (let i = 0; i < images.length; i++) {
       const img = images[i];
       if (!img.hasAttribute("alt") || img.getAttribute("alt") === "") {
         accessibilityTests.push("Alt");
       }
     }
-    // }
-    
+
     const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
     const transparency = await Promise.all(transparencyPromises);
+
+    const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getImageContrast(img.src, myPath, cellColor));
+    const colorContrast =  await Promise.all(colorContrastPromises);
   
-    accessibilityTests = [...accessibilityTests, ...transparency.map(String)];
+    accessibilityTests = [...accessibilityTests, ...transparency.map(String), ...colorContrast.map(String)];
     
     resolve(accessibilityTests);
   });
@@ -175,8 +279,11 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
     
     const transparencyPromises = Array.from(imageUrls).map((i: string) => getImageTransparency(i, myPath));
     const transparency = await Promise.all(transparencyPromises);
+
+    const colorContrastPromises = Array.from(imageUrls).map((i: string) => getImageContrast(i, myPath, cellColor));
+    const colorContrast = await Promise.all(colorContrastPromises);
   
-    accessibilityTests = [...accessibilityTests, ...transparency.map(String)];
+    accessibilityTests = [...accessibilityTests, ...transparency.map(String), ...colorContrast.map(String)];
   
     resolve(accessibilityTests);
   });
@@ -187,8 +294,8 @@ async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string)
     cell = cell as MarkdownCell;
     const cellText = cell.model.toJSON().source.toString();
     
-    const markdownNoAlt = await checkMDNoAccessIssues(cellText, myPath, window.getComputedStyle(cell.node).backgroundColor);
-    const htmlNoAlt = await checkHtmlNoAccessIssues(cellText, myPath, false, window.getComputedStyle(cell.node).backgroundColor);
+    const markdownNoAlt = await checkMDNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
+    const htmlNoAlt = await checkHtmlNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
     var issues = htmlNoAlt.concat(markdownNoAlt)
     return issues;
   } else {
@@ -201,7 +308,7 @@ async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string)
     const codeCell = cell as CodeCell;
     const outputText = codeCell.outputArea.node.outerHTML;
 
-    const generatedOutputImageIssues = await checkHtmlNoAccessIssues(outputText, myPath, true, window.getComputedStyle(cell.node).backgroundColor);
+    const generatedOutputImageIssues = await checkHtmlNoAccessIssues(outputText, myPath, document.body.style.getPropertyValue("--fill-color"));
     return generatedOutputImageIssues;
   } else {
     return [];
@@ -219,6 +326,11 @@ async function attachContentChangedListener(notebookContent: Notebook, altCellLi
 function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: string[]) {
   const indicatorId = 'accessibility-indicator-' + cell.model.id;
   altCellList.removeCell(cell.model.id);
+
+  while(document.getElementById(indicatorId)){
+    document.getElementById(indicatorId)?.remove();
+  }
+
   let applyIndic = false;
 
   for (let i = 0; i < listIssues.length; i++) {
@@ -226,6 +338,12 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
       altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
       applyIndic = true;
+    } else if(listIssues[i].split(" ")[1] == "contrast"){
+      var score = Number(listIssues[i].split(" ")[0]);
+      if (score < 5) {
+        altCellList.addCell(cell.model.id, "Cell Error: Image Contrast " + listIssues[i].split(" ")[2]);
+        applyIndic = true;
+      }
     } else if (listIssues[i] == "Alt") {
       altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
       applyIndic = true;
@@ -241,7 +359,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   
   if (applyIndic) {
     if (!document.getElementById(indicatorId)) {
-      let indicator = document.createElement('div');
+      var indicator = document.createElement('div');
       indicator.id = indicatorId;
       indicator.style.position = 'absolute';
       indicator.style.top = '30px';
@@ -465,6 +583,8 @@ class AltCellList extends Widget {
       listItem.appendChild(dropdown);
       this._listCells.appendChild(listItem);
     }
+
+    this.showOnlyVisibleCells();
   }
 
   removeCell(cellId: string): void {
