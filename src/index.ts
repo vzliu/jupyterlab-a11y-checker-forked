@@ -614,7 +614,7 @@ class AltCellList extends Widget {
     for (let i = 0; i < notebook.widgets.length; i++) {
       const cell = notebook.widgets[i];
       if (cell.model.id === cellId) {
-        cell.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        cell.node.scrollIntoView({ behavior: 'auto', block: 'center' });
 
         const originalStyle = cell.node.style.transition;
         cell.node.style.transition = 'background-color 0.5s ease';
