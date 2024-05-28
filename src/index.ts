@@ -10,40 +10,41 @@ import { IDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
 import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
-import ColorThief from 'colorthief';
-
-function hexToRgb(hex: string): { r: number, g: number, b: number } {
-  // Remove the leading hash if it's there
-  hex = hex.replace(/^#/, '');
-
-  // Parse the r, g, b values
-  let bigint = parseInt(hex, 16);
-  let r = (bigint >> 16) & 255;
-  let g = (bigint >> 8) & 255;
-  let b = bigint & 255;
-
-  return { r, g, b };
-}
-
-function luminance(r: number, g: number, b: number): number {
-  const a = [r, g, b].map(function (v) {
-      v /= 255;
-      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  });
-  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
-}
-
-function contrastRatio(l1: number, l2: number): number {
-  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-}
-
-function normalizeContrast(contrast: number): number {
-  const maxContrast = 21; // Theoretical max contrast ratio
-  const scaledContrast = (contrast - 1) / (maxContrast - 1);
-  return scaledContrast * 20; // Scale to a 0-20 range
-}
+// import ColorThief from 'colorthief';
+import Tesseract from 'tesseract.js';
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
+  function hexToRgb(hex: string): { r: number, g: number, b: number } {
+      // Remove the leading hash if it's there
+      hex = hex.replace(/^#/, '');
+
+      // Parse the r, g, b values
+      const bigint = parseInt(hex, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+
+      return { r, g, b };
+  }
+
+  function luminance(r: number, g: number, b: number): number {
+      const a = [r, g, b].map(function (v) {
+          v /= 255;
+          return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+  }
+
+  function contrastRatio(l1: number, l2: number): number {
+      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }
+
+  function normalizeContrast(contrast: number): number {
+      const maxContrast = 21; // Theoretical max contrast ratio
+      const scaledContrast = (contrast - 1) / (maxContrast - 1);
+      return scaledContrast * 20; // Scale to a 0-20 range
+  }
+
   const fgRgb = hexToRgb(foregroundHex);
   const bgRgb = hexToRgb(backgroundHex);
 
@@ -54,7 +55,59 @@ function calculateContrast(foregroundHex: string, backgroundHex: string): number
   return normalizeContrast(contrast);
 }
 
-async function getImageContrast(imageSrc: string, notebookPath: string, cellColor: string, numClusters: number = 3): Promise<string> {
+function determineBackgroundColor(imageData: ImageData): string {
+  const colorCount: { [key: string]: number } = {};
+  const data = imageData.data;
+  for (let i = 0; i < data.length / 4; i+=4) {
+      const colorKey = "#" + ((1 << 24) + (Math.floor(data[i]/10)*10 << 16) + (Math.floor(data[i+1]/10)*10 << 8) + Math.floor(data[i+2]/10)*10).toString(16).slice(1).toUpperCase();
+      colorCount[colorKey] = (colorCount[colorKey] || 0) + 1;
+  }
+  const mostCommonColor = Object.keys(colorCount).reduce((a, b) => colorCount[a] > colorCount[b] ? a : b);
+  return mostCommonColor;
+}
+
+async function determineTextColor(imageData: ImageData, imagePath: string): Promise<string[]> {
+  const result = await Tesseract.recognize(imagePath, 'eng', {
+      logger: m => console.log(m)
+  });
+  const words = result.data.words;
+  if (words.length === 0) {
+      throw new Error('No text found in the image');
+  }
+  // Assuming the first word's bounding box for example purposes
+  let cols: string[] = [];
+
+  words.forEach(word => {
+    if(word.confidence >= 85){
+      const bbox = word.bbox;
+    
+      const colorCount: { [key: string]: number } = {};
+      const data = imageData.data;
+      const width = imageData.width;
+    
+      for (let y = bbox.y0; y <= bbox.y1; y++) {
+          for (let x = bbox.x0; x <= bbox.x1; x++) {
+              const index = (y * width + x) * 4;
+              const { r, g, b } = { r: data[index], g: data[index + 1], b: data[index + 2] }
+              const colorKey = "#" + ((1 << 24) + (Math.floor(r/20)*20 << 16) + (Math.floor(g/20)*20 << 8) + Math.floor(b/20)*20).toString(16).slice(1).toUpperCase()
+              colorCount[colorKey] = (colorCount[colorKey] || 0) + 1;
+          }
+      }
+
+      var commonColor = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[1][0]
+      // var commonColor = Object.keys(colorCount).reduce((a, b) => colorCount[a] > colorCount[b] ? a : b);
+      if(!cols.includes(commonColor)){
+        cols.push(commonColor)
+      }
+      console.log(word.text + " " + word.confidence + " " + commonColor);
+      // console.log(colorCount);
+    }
+  });
+
+  return cols;
+}
+
+async function getTextContrast(imageSrc: string){
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous'; // Needed if the image is served from a different domain
@@ -69,50 +122,94 @@ async function getImageContrast(imageSrc: string, notebookPath: string, cellColo
       img.src = finalPath;
     }
 
-    img.onload = () => {
-      const colorThief = new ColorThief();
-      // const dominantColor = colorThief.getColor(img); // Gets the dominant color
-
-      const p = colorThief.getPalette(img, 3); // Get top 3 dominant colors
-      let palette: string[] = [];
-      p.forEach(c => {
-        var col = "#" + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase();
-        palette.push(col)
-      })
-      console.log('Color Palette:', palette);
-
-      var highestContrast = -1;
-      var colorHighestContrast = "";
-
-      // console.log(cellColor);
-
-      let contrast = calculateContrast(palette[0], cellColor);
-      if (contrast > highestContrast){
-        // console.log("step 1");
-        highestContrast = contrast;
-        colorHighestContrast = palette[0]
+    img.onload = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
       }
-      contrast = calculateContrast(palette[1], cellColor);
-      if (contrast > highestContrast){
-        // console.log("step 2");
-        highestContrast = contrast;
-        colorHighestContrast = palette[1]
+      ctx.drawImage(img, 0, 0);
+      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const backgroundColor = determineBackgroundColor(imageData);
+      let textColor;
+      try {
+          textColor = await determineTextColor(imageData, img.src);
+      } catch (error) {
+          console.error(error);
+          textColor = '#000000'; // Default to black if no text is found
       }
-      contrast = calculateContrast(palette[2], cellColor);
-      if (contrast > highestContrast){
-        // console.log("step 3");
-        highestContrast = contrast;
-        colorHighestContrast = palette[2]
-      }
-
-      // console.log(`Dominant Color: ${colorHighestContrast} vs cell color: ${cellColor}. Contrast: ${highestContrast}`);
-      resolve(`${highestContrast} contrast ${colorHighestContrast}`);
-
+      let contrast = calculateContrast(textColor[0], backgroundColor);
+      console.log("text colors: " + textColor[0].toString() + " bg color: " + backgroundColor + " contrast: " + contrast);
+      resolve(`${contrast} contrast ${textColor[0]}`);
     };
 
     img.onerror = () => reject('Failed to load image');
   });
 }
+
+// async function getImageContrast(imageSrc: string, notebookPath: string, cellColor: string, numClusters: number = 3): Promise<string> {
+//   getTextContrast(imageSrc);
+//   return new Promise((resolve, reject) => {
+//     const img = new Image();
+//     img.crossOrigin = 'Anonymous'; // Needed if the image is served from a different domain
+    
+//     try {
+//       new URL(imageSrc);
+//       img.src = imageSrc;
+//     } catch (_) {
+//       const baseUrl = document.location.origin;
+//       var finalPath = `${baseUrl}/files/${imageSrc}`
+//       // console.log(finalPath);
+//       img.src = finalPath;
+//     }
+
+//     img.onload = () => {
+//       const colorThief = new ColorThief();
+//       // const dominantColor = colorThief.getColor(img); // Gets the dominant color
+
+//       const p = colorThief.getPalette(img, 3, 5, false); // Get top 3 dominant colors, quality: 1 is slow 10 is fast (default)
+//       let palette: string[] = [];
+//       p.forEach(c => {
+//         var col = "#" + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase();
+//         palette.push(col)
+//       })
+//       console.log('Color Palette:', palette);
+
+//       var highestContrast = -1;
+//       var colorHighestContrast = "";
+
+//       // console.log(cellColor);
+
+//       let contrast = calculateContrast(palette[0], cellColor);
+//       if (contrast > highestContrast){
+//         // console.log("step 1");
+//         highestContrast = contrast;
+//         colorHighestContrast = palette[0]
+//       }
+//       contrast = calculateContrast(palette[1], cellColor);
+//       if (contrast > highestContrast){
+//         // console.log("step 2");
+//         highestContrast = contrast;
+//         colorHighestContrast = palette[1]
+//       }
+//       contrast = calculateContrast(palette[2], cellColor);
+//       if (contrast > highestContrast){
+//         // console.log("step 3");
+//         highestContrast = contrast;
+//         colorHighestContrast = palette[2]
+//       }
+
+//       // console.log(`Dominant Color: ${colorHighestContrast} vs cell color: ${cellColor}. Contrast: ${highestContrast}`);
+//       resolve(`${highestContrast} contrast ${colorHighestContrast}`);
+
+//     };
+
+//     img.onerror = () => reject('Failed to load image');
+//   });
+// }
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
   const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
@@ -248,7 +345,9 @@ async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, cellC
     const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
     const transparency = await Promise.all(transparencyPromises);
 
-    const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getImageContrast(img.src, myPath, cellColor));
+    // const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getImageContrast(img.src, myPath, cellColor));
+    // const colorContrast =  await Promise.all(colorContrastPromises);
+    const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getTextContrast(img.src));
     const colorContrast =  await Promise.all(colorContrastPromises);
   
     accessibilityTests = [...accessibilityTests, ...transparency.map(String), ...colorContrast.map(String)];
@@ -280,7 +379,9 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
     const transparencyPromises = Array.from(imageUrls).map((i: string) => getImageTransparency(i, myPath));
     const transparency = await Promise.all(transparencyPromises);
 
-    const colorContrastPromises = Array.from(imageUrls).map((i: string) => getImageContrast(i, myPath, cellColor));
+    // const colorContrastPromises = Array.from(imageUrls).map((i: string) => getImageContrast(i, myPath, cellColor));
+    // const colorContrast = await Promise.all(colorContrastPromises);
+    const colorContrastPromises = Array.from(imageUrls).map((i: string) => getTextContrast(i));
     const colorContrast = await Promise.all(colorContrastPromises);
   
     accessibilityTests = [...accessibilityTests, ...transparency.map(String), ...colorContrast.map(String)];
@@ -340,7 +441,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       applyIndic = true;
     } else if(listIssues[i].split(" ")[1] == "contrast"){
       var score = Number(listIssues[i].split(" ")[0]);
-      if (score < 5) {
+      if (score < 3) {
         altCellList.addCell(cell.model.id, "Cell Error: Image Contrast " + listIssues[i].split(" ")[2]);
         applyIndic = true;
       }

@@ -19,7 +19,7 @@
     "strict": true,
     "strictNullChecks": true,
     "target": "ES2018",
-    "types": []
+    "types": ["node"]
   },
   "include": ["src/*", "custom_types/*"]
 }
