@@ -14,71 +14,52 @@ import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 import Tesseract from 'tesseract.js';
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
-  function hexToRgb(hex: string): { r: number, g: number, b: number } {
-      // Remove the leading hash if it's there
-      hex = hex.replace(/^#/, '');
-
-      // Parse the r, g, b values
-      const bigint = parseInt(hex, 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-
-      return { r, g, b };
+  function hexToRgb(hex: string): { r: number; g: number; b: number } {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return { r, g, b };
+  }
+  
+  function calculateLuminance(rgb: { r: number; g: number; b: number }): number {
+    const a = [rgb.r, rgb.g, rgb.b].map(function (v) {
+      v /= 255;
+      return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+  }
+  
+  function getContrastRatio(color1: string, color2: string): number {
+    const rgb1 = hexToRgb(color1);
+    const rgb2 = hexToRgb(color2);
+    const L1 = calculateLuminance(rgb1);
+    const L2 = calculateLuminance(rgb2);
+    const lighter = Math.max(L1, L2);
+    const darker = Math.min(L1, L2);
+    return (lighter + 0.05) / (darker + 0.05);
   }
 
-  function luminance(r: number, g: number, b: number): number {
-      const a = [r, g, b].map(function (v) {
-          v /= 255;
-          return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-      });
-      return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+  try{
+    const contrast = getContrastRatio(foregroundHex, backgroundHex);
+    return contrast;
+  } catch {
+    return 21;
   }
-
-  function contrastRatio(l1: number, l2: number): number {
-      return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  }
-
-  function normalizeContrast(contrast: number): number {
-      const maxContrast = 21; // Theoretical max contrast ratio
-      const scaledContrast = (contrast - 1) / (maxContrast - 1);
-      return scaledContrast * 20; // Scale to a 0-20 range
-  }
-
-  const fgRgb = hexToRgb(foregroundHex);
-  const bgRgb = hexToRgb(backgroundHex);
-
-  const fgLuminance = luminance(fgRgb.r, fgRgb.g, fgRgb.b);
-  const bgLuminance = luminance(bgRgb.r, bgRgb.g, bgRgb.b);
-
-  const contrast = contrastRatio(fgLuminance, bgLuminance);
-  return normalizeContrast(contrast);
+  
 }
 
-function determineBackgroundColor(imageData: ImageData): string {
-  const colorCount: { [key: string]: number } = {};
-  const data = imageData.data;
-  for (let i = 0; i < data.length / 4; i+=4) {
-      const colorKey = "#" + ((1 << 24) + (Math.floor(data[i]/10)*10 << 16) + (Math.floor(data[i+1]/10)*10 << 8) + Math.floor(data[i+2]/10)*10).toString(16).slice(1).toUpperCase();
-      colorCount[colorKey] = (colorCount[colorKey] || 0) + 1;
-  }
-  const mostCommonColor = Object.keys(colorCount).reduce((a, b) => colorCount[a] > colorCount[b] ? a : b);
-  return mostCommonColor;
-}
-
-async function determineTextColor(imageData: ImageData, imagePath: string): Promise<string[]> {
+async function determineTextColor(imageData: ImageData, imagePath: string, scale: number): Promise<number> {
   const result = await Tesseract.recognize(imagePath, 'eng', {
-      logger: m => console.log(m)
+      // logger: m => console.log(m)
   });
   const words = result.data.words;
   if (words.length === 0) {
       throw new Error('No text found in the image');
   }
-  // Assuming the first word's bounding box for example purposes
-  let cols: string[] = [];
-
+  // let cols: string[] = [];
+  let minContrast = 21;
   words.forEach(word => {
-    if(word.confidence >= 85){
+    if(word.confidence >= 85 && word.text != "|" && word.text != "-" && word.text != "_" && word.text != "/" && word.text != "="){
       const bbox = word.bbox;
     
       const colorCount: { [key: string]: number } = {};
@@ -89,22 +70,26 @@ async function determineTextColor(imageData: ImageData, imagePath: string): Prom
           for (let x = bbox.x0; x <= bbox.x1; x++) {
               const index = (y * width + x) * 4;
               const { r, g, b } = { r: data[index], g: data[index + 1], b: data[index + 2] }
-              const colorKey = "#" + ((1 << 24) + (Math.floor(r/20)*20 << 16) + (Math.floor(g/20)*20 << 8) + Math.floor(b/20)*20).toString(16).slice(1).toUpperCase()
+              const colorKey = "#" + ((1 << 24) + (Math.floor(r/scale)*scale << 16) + (Math.floor(g/scale)*scale << 8) + Math.floor(b/scale)*scale).toString(16).slice(1).toUpperCase()
               colorCount[colorKey] = (colorCount[colorKey] || 0) + 1;
           }
       }
 
-      var commonColor = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[1][0]
-      // var commonColor = Object.keys(colorCount).reduce((a, b) => colorCount[a] > colorCount[b] ? a : b);
-      if(!cols.includes(commonColor)){
-        cols.push(commonColor)
+      var bgcol = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[0][0]; //most common
+      var fgcol = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[1][0]; //second most common (text color)
+
+      console.log(colorCount)
+      
+      let contrast = calculateContrast(fgcol, bgcol);
+      console.log(word.text + " " + word.confidence + " " + fgcol + " vs. " + bgcol + " with contrast " + contrast);
+      if(contrast < minContrast){
+        minContrast = contrast;
       }
-      console.log(word.text + " " + word.confidence + " " + commonColor);
       // console.log(colorCount);
     }
   });
 
-  return cols;
+  return minContrast;
 }
 
 async function getTextContrast(imageSrc: string){
@@ -133,152 +118,21 @@ async function getTextContrast(imageSrc: string){
       }
       ctx.drawImage(img, 0, 0);
       var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const backgroundColor = determineBackgroundColor(imageData);
-      let textColor;
+      // const backgroundColor = determineBackgroundColor(imageData);
+      let textContrast;
       try {
-          textColor = await determineTextColor(imageData, img.src);
+        textContrast = await determineTextColor(imageData, img.src, 30);
       } catch (error) {
-          console.error(error);
-          textColor = '#000000'; // Default to black if no text is found
+        console.error(error);
+        textContrast = 20; // Default to black if no text is found
       }
-      let contrast = calculateContrast(textColor[0], backgroundColor);
-      console.log("text colors: " + textColor[0].toString() + " bg color: " + backgroundColor + " contrast: " + contrast);
-      resolve(`${contrast} contrast ${textColor[0]}`);
+
+      // console.log("text colors: " + textColor[0].toString() + " bg color: " + backgroundColor + " contrast: " + contrast);
+        resolve(`${textContrast} contrast ${textContrast.toFixed(2)}:1`);
     };
 
     img.onerror = () => reject('Failed to load image');
   });
-}
-
-// async function getImageContrast(imageSrc: string, notebookPath: string, cellColor: string, numClusters: number = 3): Promise<string> {
-//   getTextContrast(imageSrc);
-//   return new Promise((resolve, reject) => {
-//     const img = new Image();
-//     img.crossOrigin = 'Anonymous'; // Needed if the image is served from a different domain
-    
-//     try {
-//       new URL(imageSrc);
-//       img.src = imageSrc;
-//     } catch (_) {
-//       const baseUrl = document.location.origin;
-//       var finalPath = `${baseUrl}/files/${imageSrc}`
-//       // console.log(finalPath);
-//       img.src = finalPath;
-//     }
-
-//     img.onload = () => {
-//       const colorThief = new ColorThief();
-//       // const dominantColor = colorThief.getColor(img); // Gets the dominant color
-
-//       const p = colorThief.getPalette(img, 3, 5, false); // Get top 3 dominant colors, quality: 1 is slow 10 is fast (default)
-//       let palette: string[] = [];
-//       p.forEach(c => {
-//         var col = "#" + ((1 << 24) + (c[0] << 16) + (c[1] << 8) + c[2]).toString(16).slice(1).toUpperCase();
-//         palette.push(col)
-//       })
-//       console.log('Color Palette:', palette);
-
-//       var highestContrast = -1;
-//       var colorHighestContrast = "";
-
-//       // console.log(cellColor);
-
-//       let contrast = calculateContrast(palette[0], cellColor);
-//       if (contrast > highestContrast){
-//         // console.log("step 1");
-//         highestContrast = contrast;
-//         colorHighestContrast = palette[0]
-//       }
-//       contrast = calculateContrast(palette[1], cellColor);
-//       if (contrast > highestContrast){
-//         // console.log("step 2");
-//         highestContrast = contrast;
-//         colorHighestContrast = palette[1]
-//       }
-//       contrast = calculateContrast(palette[2], cellColor);
-//       if (contrast > highestContrast){
-//         // console.log("step 3");
-//         highestContrast = contrast;
-//         colorHighestContrast = palette[2]
-//       }
-
-//       // console.log(`Dominant Color: ${colorHighestContrast} vs cell color: ${cellColor}. Contrast: ${highestContrast}`);
-//       resolve(`${highestContrast} contrast ${colorHighestContrast}`);
-
-//     };
-
-//     img.onerror = () => reject('Failed to load image');
-//   });
-// }
-
-async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string) {
-  const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
-
-  notebookContent.widgets.forEach(async cell => {
-    if (isEnabled()){
-      //Image transparency, contrast, and alt checking
-      const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
-      const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
-      var issues = mdCellIssues.concat(codeCellHasTransparency);
-      applyVisualIndicator(altCellList, cell, issues);
-
-      //header ordering checking
-      if (cell.model.type === 'markdown') {
-        const mCell = cell as MarkdownCell;
-
-        const cellText = mCell.model.toJSON().source.toString();
-        const markdownHeadingRegex = /^(#+) \s*(.*)$/gm;
-        const htmlHeadingRegex = /<h(\d+)>(.*?)<\/h\1>/gi;
-
-        let match;
-        while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
-          const level = match[1].length;  // The level is determined by the number of '#'
-          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell});
-        }
-
-        while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
-          const level = parseInt(match[1]);  // The level is directly captured by the regex
-          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
-        }
-      }
-
-      // console.log("Extracted Headings with Cell IDs:", headingsMap);
-      
-      if (headingsMap.length > 0){
-        let previousLevel = headingsMap[0].headingLevel;
-        let highestLevel = previousLevel;
-        const errors: Array<{myCell: Cell, current: string, expected: string}> = [];
-  
-        headingsMap.forEach((heading, index) => {
-          if (heading.headingLevel > previousLevel + 1) {
-            // If the current heading level skips more than one level
-            errors.push({
-              myCell: heading.myCell,
-              current: `h${heading.headingLevel}`,
-              expected: `h${previousLevel + 1}`
-            });
-          } else if (heading.headingLevel < highestLevel){
-            //if the header is higher than the first ever header
-            errors.push({
-              myCell: heading.myCell,
-              current: `h${heading.headingLevel}`,
-              expected: `h${highestLevel}`
-            });
-          }
-  
-          previousLevel = heading.headingLevel;
-        });
-  
-        errors.forEach(e => {
-          applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
-        });
-      }
-    } else {
-      applyVisualIndicator(altCellList, cell, []);
-    }
-  });
-
-  // altCellList.showOnlyVisibleCells();
 }
       
 function getImageTransparency(imgString: string, notebookPath: string): Promise<String> {
@@ -294,7 +148,7 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
       var finalPath = `${baseUrl}/files/${imgString}`
       img.src = finalPath;
     }
-
+    
     img.onload = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -306,6 +160,8 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
         resolve(10 + " transp");
         return;
       }
+
+      // console.log("checking transparency");
 
       context.drawImage(img, 0, 0);
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -320,7 +176,8 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
         }
       }
 
-      const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;      
+      const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;
+      // console.log((10 - transparencyPercentage/10))  
       resolve((10 - transparencyPercentage/10) + " transp");
     };
 
@@ -416,10 +273,90 @@ async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string)
   }
 }
 
+async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string, firstTime: boolean) {
+  const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
+
+  notebookContent.widgets.forEach(async cell => {
+    if (isEnabled()){
+      //Image transparency, contrast, and alt checking
+
+      if(firstTime){
+        applyVisualIndicator(altCellList, cell, []);
+        const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
+        const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
+        var issues = mdCellIssues.concat(codeCellHasTransparency);
+        applyVisualIndicator(altCellList, cell, issues);
+      }
+      
+
+      //header ordering checking
+      if (cell.model.type === 'markdown') {
+        const mCell = cell as MarkdownCell;
+
+        const cellText = mCell.model.toJSON().source.toString();
+        const markdownHeadingRegex = /^(#+) \s*(.*)$/gm;
+        const htmlHeadingRegex = /<h(\d+)>(.*?)<\/h\1>/gi;
+
+        let match;
+        while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
+          const level = match[1].length;  // The level is determined by the number of '#'
+          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell});
+        }
+
+        while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
+          const level = parseInt(match[1]);  // The level is directly captured by the regex
+          headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
+        }
+      }
+      
+      if (headingsMap.length > 0){
+        let previousLevel = headingsMap[0].headingLevel;
+        let highestLevel = previousLevel;
+        const errors: Array<{myCell: Cell, current: string, expected: string}> = [];
+  
+        headingsMap.forEach((heading, index) => {
+          if (heading.headingLevel > previousLevel + 1) {
+            // If the current heading level skips more than one level
+            errors.push({
+              myCell: heading.myCell,
+              current: `h${heading.headingLevel}`,
+              expected: `h${previousLevel + 1}`
+            });
+          } else if (heading.headingLevel < highestLevel){
+            //if the header is higher than the first ever header
+            errors.push({
+              myCell: heading.myCell,
+              current: `h${heading.headingLevel}`,
+              expected: `h${highestLevel}`
+            });
+          }
+  
+          previousLevel = heading.headingLevel;
+        });
+  
+        errors.forEach(e => {
+          applyVisualIndicator(altCellList, e.myCell, [])
+          applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
+        });
+      }
+    } else {
+      applyVisualIndicator(altCellList, cell, []);
+    }
+  });
+
+  // altCellList.showOnlyVisibleCells();
+}
+
 async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
   //for each existing cell, attach a content changed listener
   cell.model.contentChanged.connect(async (sender, args) => {
-    await checkAllCells(notebookContent, altCellList, isEnabled, myPath);
+    await checkAllCells(notebookContent, altCellList, isEnabled, myPath, false);
+
+    applyVisualIndicator(altCellList, cell, []);
+    const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
+    const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
+    var issues = mdCellIssues.concat(codeCellHasTransparency);
+    applyVisualIndicator(altCellList, cell, issues);
   });
   
 }
@@ -435,14 +372,14 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   let applyIndic = false;
 
   for (let i = 0; i < listIssues.length; i++) {
-
+    // console.log(listIssues[i]);
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
       altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
       applyIndic = true;
     } else if(listIssues[i].split(" ")[1] == "contrast"){
       var score = Number(listIssues[i].split(" ")[0]);
-      if (score < 3) {
-        altCellList.addCell(cell.model.id, "Cell Error: Image Contrast " + listIssues[i].split(" ")[2]);
+      if (score < 4.5) {
+        altCellList.addCell(cell.model.id, "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
         applyIndic = true;
       }
     } else if (listIssues[i] == "Alt") {
@@ -450,6 +387,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       applyIndic = true;
     } else {
       var score = Number(listIssues[i].split(" ")[0]);
+      // console.log(score);
       if (score < 9) {
         altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
         applyIndic = true;
@@ -494,7 +432,7 @@ async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, n
         labShell.collapseRight();
       }
       
-      checkAllCells(notebookPanel.content, altCellList, isEnabled, myPath);
+      checkAllCells(notebookPanel.content, altCellList, isEnabled, myPath, true);
     },
 
     tooltip: 'Toggle Alt-text Check'
@@ -556,7 +494,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);
           });
 
-          checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path)
+          checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
 
           //every time a cell is added, attach a content listener to it
           if (content.model) {
@@ -567,7 +505,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
                   if(cell){
                     const newCell = cell as Cell
                     attachContentChangedListener(content, altCellList, newCell, () => isEnabled, notebookTracker.currentWidget!.context.path);
-                    await checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path);
+                    await checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true);
                   }          
                 });
               }
@@ -600,8 +538,10 @@ class AltCellList extends Widget {
   }
 
   addCell(cellId: string, buttonContent: string): void {
+    const listItemWrapper = document.createElement('div');
+    listItemWrapper.id = 'cell-' + cellId + "_" + buttonContent;
+
     const listItem = document.createElement('div');
-    listItem.id = 'cell-' + cellId + "_" + buttonContent;
     listItem.style.display = 'flex';
     listItem.style.alignItems = 'center';
     listItem.style.flexWrap = 'nowrap';
@@ -638,7 +578,7 @@ class AltCellList extends Widget {
     
     const link = document.createElement('a');
     if (buttonContent.includes("Transparency")){
-      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
+      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html";
       link.textContent = "WCAG transparency guidelines";
     } else if(buttonContent.includes("Heading")){
       link.href = "https://www.w3.org/WAI/tutorials/page-structure/headings/";
@@ -647,8 +587,8 @@ class AltCellList extends Widget {
       link.href = "https://www.w3.org/TR/WCAG20-TECHS/H37.html";
       link.textContent = "WCAG alt-text guidelines";
     } else if(buttonContent.includes("Contrast")){
-      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color";
-      link.textContent = "WCAG contrast guidelines";
+      link.href = "https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html";
+      link.textContent = "WCAG text color contrast guidelines";
     }
     link.style.color = "#069";
     link.style.textDecoration = "underline";
@@ -671,18 +611,21 @@ class AltCellList extends Widget {
         }
       })
 
-      existingList!.push(listItem)
+      existingList!.push(listItemWrapper)
       this._cellMap.set(cellId, existingList!);
     } else {
-      this._cellMap.set(cellId, [listItem]);
+      this._cellMap.set(cellId, [listItemWrapper]);
     }
 
     
     if (add) {
       listItem.appendChild(button);
       listItem.appendChild(infoIcon);
-      listItem.appendChild(dropdown);
-      this._listCells.appendChild(listItem);
+
+      listItemWrapper.appendChild(listItem)
+      listItemWrapper.appendChild(dropdown);
+
+      this._listCells.appendChild(listItemWrapper);
     }
 
     this.showOnlyVisibleCells();
