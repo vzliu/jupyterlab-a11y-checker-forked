@@ -48,40 +48,46 @@ pip uninstall jupyterlab_a11y_checker
 
 ## Contributing
 
-### Development install
-
-Note: You will need NodeJS to build the extension package.
-
-The `jlpm` command is JupyterLab's pinned version of
-[yarn](https://yarnpkg.com/) that is installed with JupyterLab. You may use
-`yarn` or `npm` in lieu of `jlpm` below.
+### Build from Scratch
 
 ```bash
-# Clone the repo to your local environment
-# Change directory to the jupyterlab_a11y_checker directory
-# Install package in development mode
-pip install -e "."
-# Link your development version of the extension with JupyterLab
+# Create an environment using anaconda navigator: <env-name>
+
+conda activate <env-name>
+pip install cookie cutter
+python -m pip install jupyterlab notebook --pre
+mamba install -c conda-forge nodejs=18
+node -v #to check version
+
+# <pull code>
+OR
+cookiecutter https://github.com/jupyterlab/extension-cookiecutter-ts --checkout 4.0
+
+jlpm
+jlpm run build
 jupyter labextension develop . --overwrite
-# Rebuild extension Typescript source after making changes
-jlpm build
+python -m pip install -e .
+pip list #to verify it has been installed in editable mode
+jupyter labextension list #to verify it has been installed
+
+jupyter lab --no-browser #run a jupyterlab server
+
+#Run jlpm run build, then jupyter lab --no-browser to test your code after each change
 ```
 
-You can watch the source directory and run JupyterLab at the same time in different terminals to watch for changes in the extension's source and automatically rebuild the extension.
+### Build from Temp Distribution
 
 ```bash
-# Watch the source directory in one terminal, automatically rebuilding when needed
-jlpm watch
-# Run JupyterLab in another terminal
-jupyter lab
-```
+jlpm build:prod
+npm pack #creates a tarball (*.tgz file) containing your project as it would be uploaded to the npm registry. This file can be shared and installed locally.
+jupyter labextension install </path/to/your-package.tgz>
 
-With the watch command running, every saved change will immediately be built locally and available in your running JupyterLab. Refresh JupyterLab to load the change in your browser (you may need to wait several seconds for the extension to be rebuilt).
 
-By default, the `jlpm build` command generates the source maps for this extension to make it easier to debug using the browser dev tools. To also generate source maps for the JupyterLab core extensions, you can run the following command:
+# ALTERNATIOVELY IF GIVEN A tar.gz file:
 
-```bash
-jupyter lab build --minimize=False
+conda activate <env-name>
+jupyter labextension install </path/to/your-package.tgz>
+jupyter lab #this will open a local server of jupyterlab with all current extensions installed.
 ```
 
 ### Development uninstall
@@ -93,7 +99,3 @@ pip uninstall jupyterlab_a11y_checker
 In development mode, you will also need to remove the symlink created by `jupyter labextension develop`
 command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
 folder is located. Then you can remove the symlink named `jupyterlab-a11y-checker` within that folder.
-
-### Packaging the extension
-
-See [RELEASE](RELEASE.md)

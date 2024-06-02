@@ -14,6 +14,8 @@ import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 import Tesseract from 'tesseract.js';
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
+
+  //convert hex string to tuple of rgb
   function hexToRgb(hex: string): { r: number; g: number; b: number } {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -21,6 +23,7 @@ function calculateContrast(foregroundHex: string, backgroundHex: string): number
     return { r, g, b };
   }
   
+  //calulate luminance using wcag docs formula 
   function calculateLuminance(rgb: { r: number; g: number; b: number }): number {
     const a = [rgb.r, rgb.g, rgb.b].map(function (v) {
       v /= 255;
@@ -45,20 +48,17 @@ function calculateContrast(foregroundHex: string, backgroundHex: string): number
   } catch {
     return 21;
   }
-  
 }
 
 async function determineTextColor(imageData: ImageData, imagePath: string, scale: number): Promise<number> {
-  const result = await Tesseract.recognize(imagePath, 'eng', {
-      // logger: m => console.log(m)
-  });
+  const result = await Tesseract.recognize(imagePath, 'eng', {});
   const words = result.data.words;
   if (words.length === 0) {
       throw new Error('No text found in the image');
   }
-  // let cols: string[] = [];
   let minContrast = 21;
   words.forEach(word => {
+    //Filter out nonsense detections
     if(word.confidence >= 85 && word.text != "|" && word.text != "-" && word.text != "_" && word.text != "/" && word.text != "="){
       const bbox = word.bbox;
     
@@ -66,6 +66,7 @@ async function determineTextColor(imageData: ImageData, imagePath: string, scale
       const data = imageData.data;
       const width = imageData.width;
     
+      //for each bounding box, find the most common clors and store them in a dictionary
       for (let y = bbox.y0; y <= bbox.y1; y++) {
           for (let x = bbox.x0; x <= bbox.x1; x++) {
               const index = (y * width + x) * 4;
@@ -82,10 +83,11 @@ async function determineTextColor(imageData: ImageData, imagePath: string, scale
       
       let contrast = calculateContrast(fgcol, bgcol);
       console.log(word.text + " " + word.confidence + " " + fgcol + " vs. " + bgcol + " with contrast " + contrast);
+
+      //find the word with minimum contrast to flag as an issue
       if(contrast < minContrast){
         minContrast = contrast;
       }
-      // console.log(colorCount);
     }
   });
 
@@ -97,13 +99,13 @@ async function getTextContrast(imageSrc: string){
     const img = new Image();
     img.crossOrigin = 'Anonymous'; // Needed if the image is served from a different domain
     
+    //distunguish between local or hosted url
     try {
       new URL(imageSrc);
       img.src = imageSrc;
     } catch (_) {
       const baseUrl = document.location.origin;
       var finalPath = `${baseUrl}/files/${imageSrc}`
-      // console.log(finalPath);
       img.src = finalPath;
     }
 
@@ -118,17 +120,15 @@ async function getTextContrast(imageSrc: string){
       }
       ctx.drawImage(img, 0, 0);
       var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // const backgroundColor = determineBackgroundColor(imageData);
       let textContrast;
       try {
         textContrast = await determineTextColor(imageData, img.src, 30);
       } catch (error) {
         console.error(error);
-        textContrast = 20; // Default to black if no text is found
+        textContrast = 21; // Default to black if no text is found
       }
 
-      // console.log("text colors: " + textColor[0].toString() + " bg color: " + backgroundColor + " contrast: " + contrast);
-        resolve(`${textContrast} contrast ${textContrast.toFixed(2)}:1`);
+      resolve(`${textContrast} contrast ${textContrast.toFixed(2)}:1`);
     };
 
     img.onerror = () => reject('Failed to load image');
@@ -140,6 +140,7 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
     const img = new Image();
     img.crossOrigin = 'Anonymous'; // Needed for CORS-compliant images
 
+    //distunguish between local or hosted url
     try {
       new URL(imgString);
       img.src = imgString;
@@ -161,8 +162,6 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
         return;
       }
 
-      // console.log("checking transparency");
-
       context.drawImage(img, 0, 0);
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
@@ -171,13 +170,14 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
       const totalPixels = data.length / 4;
 
       for (let i = 3; i < data.length; i += 4) {
+        //if any pixel is even slightly transparent, flag as transparent
         if (data[i] < 255) {
           transparentPixelCount++;
         }
       }
 
+      //returns ratio of ht eimage that is opaque
       const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;
-      // console.log((10 - transparencyPercentage/10))  
       resolve((10 - transparencyPercentage/10) + " transp");
     };
 
@@ -186,6 +186,7 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
 }
 
 async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, cellColor: string): Promise<string[]> {
+  //Finds all possible issues within a cell while parsing it as HTML
   return new Promise(async (resolve, reject) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString, "text/html");
@@ -202,8 +203,6 @@ async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, cellC
     const transparencyPromises = Array.from(images).map((img: HTMLImageElement) => getImageTransparency(img.src, myPath));
     const transparency = await Promise.all(transparencyPromises);
 
-    // const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getImageContrast(img.src, myPath, cellColor));
-    // const colorContrast =  await Promise.all(colorContrastPromises);
     const colorContrastPromises = Array.from(images).map((img: HTMLImageElement) => getTextContrast(img.src));
     const colorContrast =  await Promise.all(colorContrastPromises);
   
@@ -214,6 +213,7 @@ async function checkHtmlNoAccessIssues(htmlString: string, myPath: string, cellC
 }
 
 async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor: string): Promise<string[]> {
+  //Finds all possible issues within a cell while parsing it as markdown
   return new Promise(async (resolve, reject) => {
     const imageNoAltRegex = /!\[\](\([^)]+\))/g;
     const allImagesRegex = /!\[.*?\]\((.*?)\)/g;
@@ -236,8 +236,6 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
     const transparencyPromises = Array.from(imageUrls).map((i: string) => getImageTransparency(i, myPath));
     const transparency = await Promise.all(transparencyPromises);
 
-    // const colorContrastPromises = Array.from(imageUrls).map((i: string) => getImageContrast(i, myPath, cellColor));
-    // const colorContrast = await Promise.all(colorContrastPromises);
     const colorContrastPromises = Array.from(imageUrls).map((i: string) => getTextContrast(i));
     const colorContrast = await Promise.all(colorContrastPromises);
   
@@ -248,6 +246,7 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
 }
 
 async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
+  //finds all issues within a text cell by parsing it as both markdown and html
   if(cell.model.type == 'markdown'){
     cell = cell as MarkdownCell;
     const cellText = cell.model.toJSON().source.toString();
@@ -262,6 +261,9 @@ async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string)
 }
 
 async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
+  //finds all issues in the output of a code cell.
+  //output of a code cell is return in rendered html format,
+  //so only need to check with html accessibility.
   if(cell.model.type == 'code'){
     const codeCell = cell as CodeCell;
     const outputText = codeCell.outputArea.node.outerHTML;
@@ -278,9 +280,8 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
 
   notebookContent.widgets.forEach(async cell => {
     if (isEnabled()){
-      //Image transparency, contrast, and alt checking
-
       if(firstTime){
+        //Image transparency, contrast, and alt checking
         applyVisualIndicator(altCellList, cell, []);
         const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
         const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
@@ -335,6 +336,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         });
   
         errors.forEach(e => {
+          //remove any issues in the heading cell which has an error before adding the heading errors
           applyVisualIndicator(altCellList, e.myCell, [])
           applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
         });
@@ -344,14 +346,15 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
     }
   });
 
-  // altCellList.showOnlyVisibleCells();
 }
 
 async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
   //for each existing cell, attach a content changed listener
   cell.model.contentChanged.connect(async (sender, args) => {
+    //this checks only the headers
     await checkAllCells(notebookContent, altCellList, isEnabled, myPath, false);
 
+    //checks for text contrast, alt tags, and transparency
     applyVisualIndicator(altCellList, cell, []);
     const mdCellIssues = await checkTextCellForImageWithAccessIssues(cell, myPath);
     const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
@@ -365,6 +368,8 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   const indicatorId = 'accessibility-indicator-' + cell.model.id;
   altCellList.removeCell(cell.model.id);
 
+  //remove all indicators (red circles) on the given cell before adding
+  //a new one to remove possible duplicates
   while(document.getElementById(indicatorId)){
     document.getElementById(indicatorId)?.remove();
   }
@@ -372,7 +377,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   let applyIndic = false;
 
   for (let i = 0; i < listIssues.length; i++) {
-    // console.log(listIssues[i]);
+    //cases for all 4 types of errors
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
       altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
       applyIndic = true;
@@ -387,7 +392,6 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       applyIndic = true;
     } else {
       var score = Number(listIssues[i].split(" ")[0]);
-      // console.log(score);
       if (score < 9) {
         altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
         applyIndic = true;
@@ -397,6 +401,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   
   
   if (applyIndic) {
+    //styling for the red indicator
     if (!document.getElementById(indicatorId)) {
       var indicator = document.createElement('div');
       indicator.id = indicatorId;
@@ -410,6 +415,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
       cell.node.appendChild(indicator);
     }
   } else {
+    //if there are no errors, then remove the indicator
     let indicator = document.getElementById(indicatorId);
     indicator?.remove();
     altCellList.removeCell(cell.model.id);
@@ -418,11 +424,8 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
 }
 
 async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, notebookPanel: NotebookPanel, isEnabled: () => boolean, toggleEnabled: () => void, myPath: string): Promise<IDisposable> {
-  
   console.log("make button")
-
   const button = new ToolbarButton({
-
     label: '🌐 a11y Checker',
     onClick: () => {
       toggleEnabled();
@@ -431,7 +434,7 @@ async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, n
       } else {
         labShell.collapseRight();
       }
-      
+      //on toggle, check all the cells
       checkAllCells(notebookPanel.content, altCellList, isEnabled, myPath, true);
     },
 
@@ -466,13 +469,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
         console.log(`Accessibility checks ${isEnabled ? 'enabled' : 'disabled'}.`);
       };
 
+      //icon for the sidebar
       const accessibilityIcon = new LabIcon({
         name: 'accessibility',
         svgstr: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#154F92" d="M256 48c114.953 0 208 93.029 208 208 0 114.953-93.029 208-208 208-114.953 0-208-93.029-208-208 0-114.953 93.029-208 208-208m0-40C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 56C149.961 64 64 149.961 64 256s85.961 192 192 192 192-85.961 192-192S362.039 64 256 64zm0 44c19.882 0 36 16.118 36 36s-16.118 36-36 36-36-16.118-36-36 16.118-36 36-36zm117.741 98.023c-28.712 6.779-55.511 12.748-82.14 15.807.851 101.023 12.306 123.052 25.037 155.621 3.617 9.26-.957 19.698-10.217 23.315-9.261 3.617-19.699-.957-23.316-10.217-8.705-22.308-17.086-40.636-22.261-78.549h-9.686c-5.167 37.851-13.534 56.208-22.262 78.549-3.615 9.255-14.05 13.836-23.315 10.217-9.26-3.617-13.834-14.056-10.217-23.315 12.713-32.541 24.185-54.541 25.037-155.621-26.629-3.058-53.428-9.027-82.141-15.807-8.6-2.031-13.926-10.648-11.895-19.249s10.647-13.926 19.249-11.895c96.686 22.829 124.283 22.783 220.775 0 8.599-2.03 17.218 3.294 19.249 11.895 2.029 8.601-3.297 17.219-11.897 19.249z"/></svg>'
       });
 
       const altCellList: AltCellList = new AltCellList(notebookTracker);
-      altCellList.id = 'AltCellList'; // Widgets need an id
+      altCellList.id = 'AltCellList';
       altCellList.title.icon = accessibilityIcon;
       labShell.add(altCellList, 'right');
       labShell.activateById('AltCellList');
@@ -493,7 +497,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
           content.widgets.forEach(async cell => {
             attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);
           });
-
           checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
 
           //every time a cell is added, attach a content listener to it
@@ -517,6 +520,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   }
 };
 
+//html styling/logic for rendering the side bar
 class AltCellList extends Widget {
   
   private _listCells: HTMLElement;
@@ -537,6 +541,7 @@ class AltCellList extends Widget {
     this.node.appendChild(this._listCells);
   }
 
+  //add a button that would navigate to the cell having the issue
   addCell(cellId: string, buttonContent: string): void {
     const listItemWrapper = document.createElement('div');
     listItemWrapper.id = 'cell-' + cellId + "_" + buttonContent;
@@ -546,6 +551,7 @@ class AltCellList extends Widget {
     listItem.style.alignItems = 'center';
     listItem.style.flexWrap = 'nowrap';
 
+    //button
     const button = document.createElement('button');
     button.classList.add("jp-toast-button");
     button.classList.add("jp-mod-link");
@@ -557,7 +563,6 @@ class AltCellList extends Widget {
     button.style.flexShrink = '1';
     button.textContent = buttonContent;
     
-
     button.addEventListener('click', () => {
       this.scrollToCell(cellId);
     });
@@ -568,6 +573,7 @@ class AltCellList extends Widget {
     infoIcon.style.cursor = 'pointer';
     infoIcon.style.marginRight = '5px';
 
+    //dropdown box
     const dropdown = document.createElement('div');
     dropdown.style.display = 'none';
     dropdown.style.marginLeft = '50px';
@@ -575,7 +581,6 @@ class AltCellList extends Widget {
     dropdown.style.backgroundColor = 'white';
     dropdown.style.border = '1px solid black';
     dropdown.style.padding = '5px';
-    
     const link = document.createElement('a');
     if (buttonContent.includes("Transparency")){
       link.href = "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html";
@@ -602,7 +607,7 @@ class AltCellList extends Widget {
     });
 
     var add = true;
-
+    //check if this error already exists in the running map, if so do not add it
     if (this._cellMap.has(cellId)){
       var existingList = this._cellMap.get(cellId)
       existingList!.forEach(b => {          
@@ -617,33 +622,28 @@ class AltCellList extends Widget {
       this._cellMap.set(cellId, [listItemWrapper]);
     }
 
-    
     if (add) {
       listItem.appendChild(button);
       listItem.appendChild(infoIcon);
-
       listItemWrapper.appendChild(listItem)
       listItemWrapper.appendChild(dropdown);
-
       this._listCells.appendChild(listItemWrapper);
     }
 
     this.showOnlyVisibleCells();
   }
 
+  //remove cell from sidebar and from running map
   removeCell(cellId: string): void {
     //get list of error buttons related to this cell
     const listItem = this._cellMap.get(cellId);
-
     if (listItem != null){
       listItem.forEach((btn) => {
-
-      for (let item of this._listCells.children) {
-        if (btn.id == item.id) {
-          this._listCells.removeChild(btn);
+        for (let item of this._listCells.children) {
+          if (btn.id == item.id) {
+            this._listCells.removeChild(btn);
+          }
         }
-      }
-          
       });
     }
     if(this._cellMap.has(cellId)){
@@ -651,6 +651,7 @@ class AltCellList extends Widget {
     }
   }
 
+  //scroll to cell once clicked
   scrollToCell(cellId: string): void {
     const notebookPanel = this._notebookTracker.currentWidget;
     const notebook = notebookPanel!.content;
@@ -660,17 +661,20 @@ class AltCellList extends Widget {
       if (cell.model.id === cellId) {
         cell.node.scrollIntoView({ behavior: 'auto', block: 'center' });
 
+        //flash the cell in a yellow color briefly when higlighted
         const originalStyle = cell.node.style.transition;
         cell.node.style.transition = 'background-color 0.5s ease';
         cell.node.style.backgroundColor = '#ffff99';
         setTimeout(() => {
           cell.node.style.backgroundColor = '';
           cell.node.style.transition = originalStyle;
-        }, 800); // Flash duration
+        }, 800);
       }
     }
   }
 
+  //helper safety method that only shows issued for cells that
+  // are visible ONLY in the currently opened jupyterlab notebook
   showOnlyVisibleCells(): void {
     var keyList = Array.from(this._cellMap.keys());
     const notebookPanel = this._notebookTracker.currentWidget;
@@ -690,6 +694,6 @@ class AltCellList extends Widget {
       }
     });
   }
-  
 }
+
 export default plugin;
