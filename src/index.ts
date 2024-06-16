@@ -79,10 +79,10 @@ async function determineTextColor(imageData: ImageData, imagePath: string, scale
       var bgcol = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[0][0]; //most common
       var fgcol = Object.entries(colorCount).sort((a, b) => b[1] - a[1])[1][0]; //second most common (text color)
 
-      console.log(colorCount)
+      // console.log(colorCount)
       
       let contrast = calculateContrast(fgcol, bgcol);
-      console.log(word.text + " " + word.confidence + " " + fgcol + " vs. " + bgcol + " with contrast " + contrast);
+      // console.log(word.text + " " + word.confidence + " " + fgcol + " vs. " + bgcol + " with contrast " + contrast);
 
       //find the word with minimum contrast to flag as an issue
       if(contrast < minContrast){
@@ -109,29 +109,34 @@ async function getTextContrast(imageSrc: string){
       img.src = finalPath;
     }
 
-    img.onload = async () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
+    try{
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve("21 contrast 21.00:1")
           return;
-      }
-      ctx.drawImage(img, 0, 0);
-      var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      let textContrast;
-      try {
-        textContrast = await determineTextColor(imageData, img.src, 30);
-      } catch (error) {
-        console.error(error);
-        textContrast = 21; // Default to black if no text is found
-      }
+        }
+        ctx.drawImage(img, 0, 0);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let textContrast;
+        try {
+          textContrast = await determineTextColor(imageData, img.src, 30);
+        } catch (error) {
+          console.error(error);
+          textContrast = 21; // Default to black if no text is found
+        }
+  
+        resolve(`${textContrast} contrast ${textContrast.toFixed(2)}:1`);
+      };
+    } catch {
+      resolve("21 contrast 21.00:1");
+    }
+    
 
-      resolve(`${textContrast} contrast ${textContrast.toFixed(2)}:1`);
-    };
-
-    img.onerror = () => reject('Failed to load image');
+    // img.onerror = () => reject('Failed to load image');
   });
 }
       
@@ -149,39 +154,41 @@ function getImageTransparency(imgString: string, notebookPath: string): Promise<
       var finalPath = `${baseUrl}/files/${imgString}`
       img.src = finalPath;
     }
-    
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      const context = canvas.getContext('2d');
-      if (!context) {
-        console.log('Failed to get canvas context');
-        resolve(10 + " transp");
-        return;
-      }
-
-      context.drawImage(img, 0, 0);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      let transparentPixelCount = 0;
-      const totalPixels = data.length / 4;
-
-      for (let i = 3; i < data.length; i += 4) {
-        //if any pixel is even slightly transparent, flag as transparent
-        if (data[i] < 255) {
-          transparentPixelCount++;
+    try{
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+  
+        const context = canvas.getContext('2d');
+        if (!context) {
+          // console.log('Failed to get canvas context');
+          resolve(10 + " transp");
+          return;
         }
-      }
-
-      //returns ratio of ht eimage that is opaque
-      const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;
-      resolve((10 - transparencyPercentage/10) + " transp");
-    };
-
-    img.onerror = () => reject('Failed to load image');
+  
+        context.drawImage(img, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+  
+        let transparentPixelCount = 0;
+        const totalPixels = data.length / 4;
+  
+        for (let i = 3; i < data.length; i += 4) {
+          //if any pixel is even slightly transparent, flag as transparent
+          if (data[i] < 255) {
+            transparentPixelCount++;
+          }
+        }
+  
+        //returns ratio of ht eimage that is opaque
+        const transparencyPercentage = (transparentPixelCount / totalPixels) * 100;
+        resolve((10 - transparencyPercentage/10) + " transp");
+      };
+    } catch {
+      console.log('Failed to get canvas context');
+      resolve(10 + " transp");
+    }
   });
 }
 
@@ -247,32 +254,42 @@ async function checkMDNoAccessIssues(mdString: string, myPath: string, cellColor
 
 async function checkTextCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
   //finds all issues within a text cell by parsing it as both markdown and html
-  if(cell.model.type == 'markdown'){
-    cell = cell as MarkdownCell;
-    const cellText = cell.model.toJSON().source.toString();
-    
-    const markdownNoAlt = await checkMDNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
-    const htmlNoAlt = await checkHtmlNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
-    var issues = htmlNoAlt.concat(markdownNoAlt)
-    return issues;
-  } else {
+  try{
+    if(cell.model.type == 'markdown'){
+      cell = cell as MarkdownCell;
+      const cellText = cell.model.toJSON().source.toString();
+      
+      const markdownNoAlt = await checkMDNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
+      const htmlNoAlt = await checkHtmlNoAccessIssues(cellText, myPath, document.body.style.getPropertyValue("--fill-color"));
+      var issues = htmlNoAlt.concat(markdownNoAlt)
+      return issues;
+    } else {
+      return [];
+    }
+  } catch {
     return [];
   }
+  
 }
 
 async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string): Promise<string[]> {
   //finds all issues in the output of a code cell.
   //output of a code cell is return in rendered html format,
   //so only need to check with html accessibility.
-  if(cell.model.type == 'code'){
-    const codeCell = cell as CodeCell;
-    const outputText = codeCell.outputArea.node.outerHTML;
-
-    const generatedOutputImageIssues = await checkHtmlNoAccessIssues(outputText, myPath, document.body.style.getPropertyValue("--fill-color"));
-    return generatedOutputImageIssues;
-  } else {
+  try{
+    if(cell.model.type == 'code'){
+      const codeCell = cell as CodeCell;
+      const outputText = codeCell.outputArea.node.outerHTML;
+  
+      const generatedOutputImageIssues = await checkHtmlNoAccessIssues(outputText, myPath, document.body.style.getPropertyValue("--fill-color"));
+      return generatedOutputImageIssues;
+    } else {
+      return [];
+    }
+  } catch {
     return [];
   }
+  
 }
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string, firstTime: boolean) {
@@ -289,7 +306,6 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         applyVisualIndicator(altCellList, cell, issues);
       }
       
-
       //header ordering checking
       if (cell.model.type === 'markdown') {
         const mCell = cell as MarkdownCell;
@@ -345,7 +361,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
       applyVisualIndicator(altCellList, cell, []);
     }
   });
-
+  altCellList.showOnlyVisibleCells();
 }
 
 async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
@@ -365,7 +381,13 @@ async function attachContentChangedListener(notebookContent: Notebook, altCellLi
 }
 
 function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: string[]) {
-  const indicatorId = 'accessibility-indicator-' + cell.model.id;
+  var indicatorId: string;
+  try {
+    indicatorId = 'accessibility-indicator-' + cell.model.id;
+  } catch {
+    return;
+  }
+  
   altCellList.removeCell(cell.model.id);
 
   //remove all indicators (red circles) on the given cell before adding
@@ -420,11 +442,10 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
     indicator?.remove();
     altCellList.removeCell(cell.model.id);
   }
-
+  // altCellList.showOnlyVisibleCells();
 }
 
 async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, notebookPanel: NotebookPanel, isEnabled: () => boolean, toggleEnabled: () => void, myPath: string): Promise<IDisposable> {
-  console.log("make button")
   const button = new ToolbarButton({
     label: '🌐 a11y Checker',
     onClick: () => {
@@ -442,7 +463,7 @@ async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, n
   });
 
   button.id = "alt-text-check-toggle";
-  notebookPanel.toolbar.insertItem(10, 'altTextCheck', button);
+  notebookPanel.toolbar.insertItem(0, 'altTextCheck', button);
   
   let elem = document.getElementById('alt-text-check-toggle');
   elem!.style.backgroundColor = '#0000';
@@ -455,67 +476,72 @@ const plugin: JupyterFrontEndPlugin<void> = {
   autoStart: true,
   requires: [INotebookTracker, ILabShell],
   activate: (app: JupyterFrontEnd, notebookTracker: INotebookTracker, labShell: ILabShell) => {
-    console.log("before wait")
-    new Promise<void>(resolve => {
-      setTimeout(resolve, 0);
-    }).then(() => {
+    console.log('JupyterLab extension jupyterlab_accessibility is activated!');
 
-      console.log('JupyterLab extension jupyterlab_accessibility is activated!');
+    let isEnabled = true;
+    // Function to toggle the isEnabled state
+    const toggleEnabled = () => {
+      isEnabled = !isEnabled;
+      console.log(`Accessibility checks ${isEnabled ? 'enabled' : 'disabled'}.`);
+    };
 
-      let isEnabled = true;
-      // Function to toggle the isEnabled state
-      const toggleEnabled = () => {
-        isEnabled = !isEnabled;
-        console.log(`Accessibility checks ${isEnabled ? 'enabled' : 'disabled'}.`);
-      };
+    //icon for the sidebar
+    const accessibilityIcon = new LabIcon({
+      name: 'accessibility',
+      svgstr: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#154F92" d="M256 48c114.953 0 208 93.029 208 208 0 114.953-93.029 208-208 208-114.953 0-208-93.029-208-208 0-114.953 93.029-208 208-208m0-40C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 56C149.961 64 64 149.961 64 256s85.961 192 192 192 192-85.961 192-192S362.039 64 256 64zm0 44c19.882 0 36 16.118 36 36s-16.118 36-36 36-36-16.118-36-36 16.118-36 36-36zm117.741 98.023c-28.712 6.779-55.511 12.748-82.14 15.807.851 101.023 12.306 123.052 25.037 155.621 3.617 9.26-.957 19.698-10.217 23.315-9.261 3.617-19.699-.957-23.316-10.217-8.705-22.308-17.086-40.636-22.261-78.549h-9.686c-5.167 37.851-13.534 56.208-22.262 78.549-3.615 9.255-14.05 13.836-23.315 10.217-9.26-3.617-13.834-14.056-10.217-23.315 12.713-32.541 24.185-54.541 25.037-155.621-26.629-3.058-53.428-9.027-82.141-15.807-8.6-2.031-13.926-10.648-11.895-19.249s10.647-13.926 19.249-11.895c96.686 22.829 124.283 22.783 220.775 0 8.599-2.03 17.218 3.294 19.249 11.895 2.029 8.601-3.297 17.219-11.897 19.249z"/></svg>'
+    });
 
-      //icon for the sidebar
-      const accessibilityIcon = new LabIcon({
-        name: 'accessibility',
-        svgstr: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#154F92" d="M256 48c114.953 0 208 93.029 208 208 0 114.953-93.029 208-208 208-114.953 0-208-93.029-208-208 0-114.953 93.029-208 208-208m0-40C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 56C149.961 64 64 149.961 64 256s85.961 192 192 192 192-85.961 192-192S362.039 64 256 64zm0 44c19.882 0 36 16.118 36 36s-16.118 36-36 36-36-16.118-36-36 16.118-36 36-36zm117.741 98.023c-28.712 6.779-55.511 12.748-82.14 15.807.851 101.023 12.306 123.052 25.037 155.621 3.617 9.26-.957 19.698-10.217 23.315-9.261 3.617-19.699-.957-23.316-10.217-8.705-22.308-17.086-40.636-22.261-78.549h-9.686c-5.167 37.851-13.534 56.208-22.262 78.549-3.615 9.255-14.05 13.836-23.315 10.217-9.26-3.617-13.834-14.056-10.217-23.315 12.713-32.541 24.185-54.541 25.037-155.621-26.629-3.058-53.428-9.027-82.141-15.807-8.6-2.031-13.926-10.648-11.895-19.249s10.647-13.926 19.249-11.895c96.686 22.829 124.283 22.783 220.775 0 8.599-2.03 17.218 3.294 19.249 11.895 2.029 8.601-3.297 17.219-11.897 19.249z"/></svg>'
-      });
+    const altCellList: AltCellList = new AltCellList(notebookTracker);
+    altCellList.id = 'AltCellList';
+    altCellList.title.icon = accessibilityIcon;
+    labShell.add(altCellList, 'right');
+    labShell.activateById('AltCellList');
 
-      const altCellList: AltCellList = new AltCellList(notebookTracker);
-      altCellList.id = 'AltCellList';
-      altCellList.title.icon = accessibilityIcon;
-      labShell.add(altCellList, 'right');
-      labShell.activateById('AltCellList');
+    notebookTracker.currentChanged.connect((sender, notebookPanel) => {
+      if (!notebookPanel) return;
       
-      // When a new notebook is created or opened, add the toolbar button
-      notebookTracker.widgetAdded.connect((sender, notebookPanel: NotebookPanel) => {
-        console.log("able to add toolbar button");
-        addToolbarButton(labShell, altCellList, notebookPanel, () => isEnabled, toggleEnabled, notebookTracker.currentWidget!.context.path);
-      });
+      notebookPanel.context.ready.then(() => {
+        const { content } = notebookPanel;
 
-      notebookTracker.currentChanged.connect((sender, notebookPanel) => {
-        if (!notebookPanel) return;
-        
-        notebookPanel.context.ready.then(() => {
-          const { content } = notebookPanel;
+        //for each existing cell, attach a content changed listener
+        content.widgets.forEach(async cell => {
+          attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);
+        });
+        checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
 
-          //for each existing cell, attach a content changed listener
-          content.widgets.forEach(async cell => {
-            attachContentChangedListener(content, altCellList, cell, () => isEnabled, notebookTracker.currentWidget!.context.path);
+        //every time a cell is added, attach a content listener to it
+        if (content.model) {
+          content.model.cells.changed.connect((sender, args) => {
+            if (args.type === 'add') {
+              args.newValues.forEach(async (cellModel: ICellModel) => {
+                const cell = content.widgets.find(c => c.model.id === cellModel.id);
+                if(cell){
+                  const newCell = cell as Cell
+                  attachContentChangedListener(content, altCellList, newCell, () => isEnabled, notebookTracker.currentWidget!.context.path);
+                  await checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
+                }          
+              });
+            }
           });
-          checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
+        }
+      });
+    });
 
-          //every time a cell is added, attach a content listener to it
-          if (content.model) {
-            content.model.cells.changed.connect((sender, args) => {
-              if (args.type === 'add') {
-                args.newValues.forEach(async (cellModel: ICellModel) => {
-                  const cell = content.widgets.find(c => c.model.id === cellModel.id);
-                  if(cell){
-                    const newCell = cell as Cell
-                    attachContentChangedListener(content, altCellList, newCell, () => isEnabled, notebookTracker.currentWidget!.context.path);
-                    await checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true);
-                  }          
-                });
-              }
-            });
+    // When a new notebook is created or opened, add the toolbar button
+    notebookTracker.widgetAdded.connect((sender, notebookPanel: NotebookPanel) => {
+      // while(!document.getElementById("alt-text-check-toggle")){
+        notebookTracker.currentWidget?.context.ready.then(() => {
+          try{
+            console.log("trying to add toolbar button");
+            console.log(notebookTracker.currentWidget!)
+            addToolbarButton(labShell, altCellList, notebookPanel, () => isEnabled, toggleEnabled, notebookTracker.currentWidget!.context.path);
+            console.log("able to add toolbar button");
+          } catch {
+            console.log("trying again to add toolbar button")
           }
         });
-      });
+        
+      // } 
     });
   }
 };
@@ -630,7 +656,7 @@ class AltCellList extends Widget {
       this._listCells.appendChild(listItemWrapper);
     }
 
-    this.showOnlyVisibleCells();
+    // this.showOnlyVisibleCells();
   }
 
   //remove cell from sidebar and from running map
@@ -676,6 +702,7 @@ class AltCellList extends Widget {
   //helper safety method that only shows issued for cells that
   // are visible ONLY in the currently opened jupyterlab notebook
   showOnlyVisibleCells(): void {
+    console.log("showing only visible cells");
     var keyList = Array.from(this._cellMap.keys());
     const notebookPanel = this._notebookTracker.currentWidget;
     const notebook = notebookPanel!.content;

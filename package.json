@@ -1,6 +1,6 @@
 {
   "name": "jupyterlab-a11y-checker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A JupyterLab extension.",
   "keywords": [
     "jupyter",
@@ -55,12 +55,12 @@
   },
   "dependencies": {
     "@jupyterlab/application": "^4.0.0",
-    "@jupyterlab/apputils": "^4.2.4",
-    "@jupyterlab/cells": "^4.1.2",
-    "@jupyterlab/mainmenu": "^4.1.2",
+    "@jupyterlab/apputils": "^4.3.1",
+    "@jupyterlab/cells": "^4.2.2",
+    "@jupyterlab/mainmenu": "^4.2.1",
     "@jupyterlab/nbformat": "^4.1.2",
-    "@jupyterlab/notebook": "^4.1.1",
-    "@jupyterlab/ui-components": "^4.1.5",
+    "@jupyterlab/notebook": "^4.2.2",
+    "@jupyterlab/ui-components": "^4.2.1",
     "@lumino/disposable": "^2.1.2",
     "@lumino/widgets": "^2.3.1",
     "colorthief": "^2.4.0",

@@ -37,15 +37,6 @@ To install the extension, execute:
 ```bash
 pip install jupyterlab_a11y_checker
 ```
-
-## Uninstall
-
-To remove the extension, execute:
-
-```bash
-pip uninstall jupyterlab_a11y_checker
-```
-
 ## Contributing
 
 ### Build from Scratch
@@ -88,6 +79,24 @@ jupyter labextension install </path/to/your-package.tgz>
 conda activate <env-name>
 jupyter labextension install </path/to/your-package.tgz>
 jupyter lab #this will open a local server of jupyterlab with all current extensions installed.
+```
+
+### Pip Distribution
+```bash
+pip install twine
+
+# create a ~/.pypirc file at root and add this to it:
+[distutils]
+index-servers =
+	pypi
+
+[pypi]
+repository: https://upload.pypi.org/legacy/
+username: __token__
+password: your-api-token
+
+#run this command and publish to pip.
+twine upload your-package.whl
 ```
 
 ### Development uninstall
