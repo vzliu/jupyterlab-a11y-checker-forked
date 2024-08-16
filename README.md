@@ -21,8 +21,14 @@ Should the color contrast ratio deviate from the standards set in guideline 1.4.
 WCAG 2.0/2.1 Guideline 1.4.3: The visual presentation of text and images of text has a contrast ratio of at least 4.5:1, except for the following: (Level AA)
 Large Text: Large-scale text and images of large-scale text have a contrast ratio of at least 3:1;, Incidental: Text or images of text that are part of an inactive user interface component, that are pure decoration, that are not visible to anyone, or that are part of a picture that contains significant other visual content, have no contrast requirement, Logotypes: Text that is part of a logo or brand name has no minimum contrast requirement.
 
+## How to use the extension
+
 For step by step approach to use the extension, see the [following snapshots](https://scribehow.com/shared/Using_A11Y_Checker_for_Accessibility_Compliance__VBJ2gzstRb-dY9dKhzcFiw
 )
+
+## Pypi link for downloading and installing the extension
+
+https://pypi.org/project/jupyterlab-a11y-checker/
 
 # jupyterlab_a11y_checker 
 
