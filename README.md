@@ -32,7 +32,6 @@ https://pypi.org/project/jupyterlab-a11y-checker/
 
 # jupyterlab_a11y_checker 
 
-[![Github Actions Status](https://github.com/github_username/jupyterlab-a11y-checker/workflows/Build/badge.svg)](https://github.com/github_username/jupyterlab-a11y-checker/actions/workflows/build.yml)[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/github_username/jupyterlab-a11y-checker/main?urlpath=lab)
 A JupyterLab extension.
 
 ## Requirements
