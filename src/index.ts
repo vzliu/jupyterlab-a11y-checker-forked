@@ -446,6 +446,79 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   // altCellList.showOnlyVisibleCells();
 }
 
+
+//START HERE
+
+//NOTIFICATIONS
+// Define the base URL for your JupyterLab server
+const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
+
+// Notification details
+const notificationData = {
+    origin: "notification",  // Unique name for your extension or use case
+    title: "Test",
+    body: "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to “Windowing mode”, and choose defer",
+    subject: "notification",
+    recipient: ["*"],  // Send to all users
+    ephemeral: true,  // True for non-persistent notifications
+    notifTimeout: 10,  // Timeout in seconds
+    notifType: "completion"  // Type, affects icon and color
+};
+
+// Function to send notification
+async function sendNotification() {
+    try {
+        const response = await fetch(`${baseUrl}/notifications`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(notificationData)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log("Notification sent successfully:", data);
+        } else {
+            const errorData = await response.json();
+            console.error("Failed to send notification:", response.status, errorData);
+        }
+    } catch (error) {
+        console.error("Error:", error);
+    }
+}
+
+// Call the function to send the notification
+sendNotification();
+
+
+
+//CHATGPT API
+const openai = new OpenAI({
+  organization: "org-dHYOUEmDKexcHR4shmgPyZjE",
+  project: "$PROJECT_ID",
+});
+//first pass in an image locally into openai API and see what text it outputs
+//START HERE
+//function const openai = new OpenAI();
+
+async function gptTest() {
+  const stream = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: "Say this is a test" }],
+      stream: true,
+      
+  });
+  for await (const chunk of stream) {
+      process.stdout.write(chunk.choices[0]?.delta?.content || "");
+  }
+}
+
+gptTest();
+//console.log();
+
+
+
 async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, notebookPanel: NotebookPanel, isEnabled: () => boolean, toggleEnabled: () => void, myPath: string): Promise<IDisposable> {
   const button = new ToolbarButton({
     label: '🌐 a11y Checker',
@@ -723,12 +796,7 @@ class AltCellList extends Widget {
     });
   }
 
-  //first pass in an image locally into openai API and see what text it outputs
-  //START HERE
-  function const openai = new OpenAI();
 
-
-  console.log();
 
 
 }

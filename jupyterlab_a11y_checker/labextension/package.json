@@ -64,6 +64,9 @@
     "@lumino/disposable": "^2.1.2",
     "@lumino/widgets": "^2.3.1",
     "colorthief": "^2.4.0",
+    "openai": "^4.68.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
@@ -88,6 +91,7 @@
     "stylelint-config-standard": "^26.0.0",
     "stylelint-prettier": "^2.0.0",
     "typescript": "~5.0.2",
+    "webpack": "^5.96.1",
     "yjs": "^13.5.0"
   },
   "sideEffects": [
@@ -102,7 +106,7 @@
     "extension": true,
     "outputDir": "jupyterlab_a11y_checker/labextension",
     "_build": {
-      "load": "static/remoteEntry.2eb4105a3eb3eba0e8f6.js",
+      "load": "static/remoteEntry.b55940bc12ef47909b9c.js",
       "extension": "./extension",
       "style": "./style"
     }
@@ -184,5 +188,6 @@
       "selector-no-vendor-prefix": null,
       "value-no-vendor-prefix": null
     }
-  }
+  },
+  "packageManager": "yarn@4.5.1"
 }
