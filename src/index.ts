@@ -12,6 +12,7 @@ import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 // import ColorThief from 'colorthief';
 import Tesseract from 'tesseract.js';
+import OpenAI from "openai";
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
 
@@ -721,6 +722,15 @@ class AltCellList extends Widget {
       }
     });
   }
+
+  //first pass in an image locally into openai API and see what text it outputs
+  //START HERE
+  function const openai = new OpenAI();
+
+
+  console.log();
+
+
 }
 
 export default plugin;
