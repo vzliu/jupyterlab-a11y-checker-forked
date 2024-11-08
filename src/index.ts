@@ -451,7 +451,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
 
 //NOTIFICATIONS
 // Define the base URL for your JupyterLab server
-const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
+/*const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
 
 // Notification details
 const notificationData = {
@@ -488,8 +488,10 @@ async function sendNotification() {
     }
 }
 
+
+
 // Call the function to send the notification
-sendNotification();
+sendNotification();*/
 
 
 
@@ -551,6 +553,32 @@ const plugin: JupyterFrontEndPlugin<void> = {
   requires: [INotebookTracker, ILabShell],
   activate: (app: JupyterFrontEnd, notebookTracker: INotebookTracker, labShell: ILabShell) => {
     console.log('JupyterLab extension jupyterlab_accessibility is activated!');
+
+    // Function to show a notification
+    function showStartupNotification() {
+      if (Notification.permission === 'granted') {
+        // Display the notification
+        new Notification("JupyterLab Reminder", {
+          body: "Please remember to change [your setting here] to enhance your experience.",
+          icon: '/static/favicon.ico' // Optional: Add an icon for the notification
+        });
+      } else if (Notification.permission !== 'denied') {
+        // Request permission if not already granted
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification("JupyterLab Reminder", {
+              body: "Please remember to change [your setting here] to enhance your experience.",
+              icon: '/static/favicon.ico'
+            });
+          }
+        });
+      }
+    }
+
+    // Show the notification once JupyterLab is fully ready
+    app.restored.then(() => {
+      showStartupNotification();
+    });
 
     let isEnabled = true;
     // Function to toggle the isEnabled state
