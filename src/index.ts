@@ -554,24 +554,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   activate: (app: JupyterFrontEnd, notebookTracker: INotebookTracker, labShell: ILabShell) => {
     console.log('JupyterLab extension jupyterlab_accessibility is activated!');
 
-    // Function to show a notification
-    function showStartupNotification() {
-      if (Notification.permission === 'granted') {
-        // Display the notification
-        new Notification("JupyterLab Reminder", {
-          body: "Please remember to change [your setting here] to enhance your experience.",
-        });
-      } else if (Notification.permission !== 'denied') {
-        // Request permission if not already granted
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification("JupyterLab Reminder", {
-              body: "Please remember to change [your setting here] to enhance your experience.",
-            });
-          }
-        });
-      }
-    }
+    
 
     // Show the notification once JupyterLab is fully ready
     app.restored.then(() => {
