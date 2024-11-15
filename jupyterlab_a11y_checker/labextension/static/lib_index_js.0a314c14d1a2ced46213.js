@@ -421,18 +421,20 @@ function applyVisualIndicator(altCellList, cell, listIssues) {
 //START HERE
 //NOTIFICATIONS
 // Define the base URL for your JupyterLab server
-const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
+/*const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
+
 // Notification details
 const notificationData = {
-    origin: "notification",
+    origin: "notification",  // Unique name for your extension or use case
     title: "Test",
     body: "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to “Windowing mode”, and choose defer",
     subject: "notification",
-    recipient: ["*"],
-    ephemeral: true,
-    notifTimeout: 10,
-    notifType: "completion" // Type, affects icon and color
+    recipient: ["*"],  // Send to all users
+    ephemeral: true,  // True for non-persistent notifications
+    notifTimeout: 10,  // Timeout in seconds
+    notifType: "completion"  // Type, affects icon and color
 };
+
 // Function to send notification
 async function sendNotification() {
     try {
@@ -443,21 +445,23 @@ async function sendNotification() {
             },
             body: JSON.stringify(notificationData)
         });
+
         if (response.ok) {
             const data = await response.json();
             console.log("Notification sent successfully:", data);
-        }
-        else {
+        } else {
             const errorData = await response.json();
             console.error("Failed to send notification:", response.status, errorData);
         }
-    }
-    catch (error) {
+    } catch (error) {
         console.error("Error:", error);
     }
 }
+
+
+
 // Call the function to send the notification
-sendNotification();
+sendNotification();*/
 //CHATGPT API
 const openai = new (openai__WEBPACK_IMPORTED_MODULE_6___default())({
     organization: "org-dHYOUEmDKexcHR4shmgPyZjE",
@@ -507,6 +511,31 @@ const plugin = {
     requires: [_jupyterlab_notebook__WEBPACK_IMPORTED_MODULE_1__.INotebookTracker, _jupyterlab_application__WEBPACK_IMPORTED_MODULE_0__.ILabShell],
     activate: (app, notebookTracker, labShell) => {
         console.log('JupyterLab extension jupyterlab_accessibility is activated!');
+        // Function to show a notification
+        function showStartupNotification() {
+            if (Notification.permission === 'granted') {
+                // Display the notification
+                new Notification("JupyterLab Reminder", {
+                    body: "Please remember to change [your setting here] to enhance your experience.",
+                    icon: '/static/favicon.ico' // Optional: Add an icon for the notification
+                });
+            }
+            else if (Notification.permission !== 'denied') {
+                // Request permission if not already granted
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification("JupyterLab Reminder", {
+                            body: "Please remember to change [your setting here] to enhance your experience.",
+                            icon: '/static/favicon.ico'
+                        });
+                    }
+                });
+            }
+        }
+        // Show the notification once JupyterLab is fully ready
+        app.restored.then(() => {
+            showStartupNotification();
+        });
         let isEnabled = true;
         // Function to toggle the isEnabled state
         const toggleEnabled = () => {
@@ -924,4 +953,4 @@ process.umask = function() { return 0; };
 /***/ })
 
 }]);
-//# sourceMappingURL=lib_index_js.d5bab1a925ebcc71b274.js.map
+//# sourceMappingURL=lib_index_js.0a314c14d1a2ced46213.js.map

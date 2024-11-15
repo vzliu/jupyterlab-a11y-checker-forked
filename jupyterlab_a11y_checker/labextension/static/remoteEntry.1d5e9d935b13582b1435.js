@@ -124,7 +124,7 @@ __webpack_require__.d(exports, {
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "" + chunkId + "." + {"lib_index_js":"d5bab1a925ebcc71b274","style_index_js":"382bc657a9e7d933ea12","vendors-node_modules_openai_index_mjs":"ce821e6ea448e61fe62c","node_modules_process_browser_js":"a7ce076aa9e6f3c10ebf","vendors-node_modules_tesseract_js_src_index_js":"38455306d78140c51283"}[chunkId] + ".js";
+/******/ 			return "" + chunkId + "." + {"lib_index_js":"0a314c14d1a2ced46213","style_index_js":"382bc657a9e7d933ea12","vendors-node_modules_openai_index_mjs":"ce821e6ea448e61fe62c","node_modules_process_browser_js":"a7ce076aa9e6f3c10ebf","vendors-node_modules_tesseract_js_src_index_js":"38455306d78140c51283"}[chunkId] + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -402,11 +402,11 @@ __webpack_require__.d(exports, {
 /******/ 		});
 /******/ 		var installedModules = {};
 /******/ 		var moduleToHandlerMapping = {
-/******/ 			"webpack/sharing/consume/default/@jupyterlab/application": () => (loadSingletonVersion("default", "@jupyterlab/application", false, [1,4,3,0])),
-/******/ 			"webpack/sharing/consume/default/@jupyterlab/notebook": () => (loadSingletonVersion("default", "@jupyterlab/notebook", false, [1,4,3,0])),
-/******/ 			"webpack/sharing/consume/default/@jupyterlab/apputils": () => (loadSingletonVersion("default", "@jupyterlab/apputils", false, [1,4,4,0])),
+/******/ 			"webpack/sharing/consume/default/@jupyterlab/application": () => (loadSingletonVersion("default", "@jupyterlab/application", false, [1,4,2,5])),
+/******/ 			"webpack/sharing/consume/default/@jupyterlab/notebook": () => (loadSingletonVersion("default", "@jupyterlab/notebook", false, [1,4,2,5])),
+/******/ 			"webpack/sharing/consume/default/@jupyterlab/apputils": () => (loadSingletonVersion("default", "@jupyterlab/apputils", false, [1,4,3,5])),
 /******/ 			"webpack/sharing/consume/default/@lumino/widgets": () => (loadSingletonVersion("default", "@lumino/widgets", false, [1,2,3,1,,"alpha",0])),
-/******/ 			"webpack/sharing/consume/default/@jupyterlab/ui-components": () => (loadSingletonVersion("default", "@jupyterlab/ui-components", false, [1,4,3,0])),
+/******/ 			"webpack/sharing/consume/default/@jupyterlab/ui-components": () => (loadSingletonVersion("default", "@jupyterlab/ui-components", false, [1,4,2,5])),
 /******/ 			"webpack/sharing/consume/default/tesseract.js/tesseract.js": () => (loadStrictVersion("default", "tesseract.js", false, [1,5,1,0], () => (__webpack_require__.e("vendors-node_modules_tesseract_js_src_index_js").then(() => (() => (__webpack_require__(/*! tesseract.js */ "./node_modules/tesseract.js/src/index.js"))))))),
 /******/ 			"webpack/sharing/consume/default/openai/openai": () => (loadStrictVersion("default", "openai", false, [1,4,68,4], () => (__webpack_require__.e("vendors-node_modules_openai_index_mjs").then(() => (() => (__webpack_require__(/*! openai */ "./node_modules/openai/index.mjs")))))))
 /******/ 		};
@@ -560,4 +560,4 @@ __webpack_require__.d(exports, {
 /******/ 	
 /******/ })()
 ;
-//# sourceMappingURL=remoteEntry.b55940bc12ef47909b9c.js.map
+//# sourceMappingURL=remoteEntry.1d5e9d935b13582b1435.js.map

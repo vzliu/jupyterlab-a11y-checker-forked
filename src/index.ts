@@ -560,7 +560,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
         // Display the notification
         new Notification("JupyterLab Reminder", {
           body: "Please remember to change [your setting here] to enhance your experience.",
-          icon: '/static/favicon.ico' // Optional: Add an icon for the notification
         });
       } else if (Notification.permission !== 'denied') {
         // Request permission if not already granted
@@ -568,7 +567,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
           if (permission === 'granted') {
             new Notification("JupyterLab Reminder", {
               body: "Please remember to change [your setting here] to enhance your experience.",
-              icon: '/static/favicon.ico'
             });
           }
         });
