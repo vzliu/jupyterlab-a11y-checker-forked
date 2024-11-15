@@ -629,16 +629,16 @@ class AltCellList extends Widget {
     this._listCells = document.createElement('div');
     this._notebookTracker = notebookTracker;
 
-    let title = document.createElement('h3');
-    title.innerHTML = "Cells with Accessibility Issues";
+    let title = document.createElement('h2');
+    title.innerHTML = "Cells with Accessibility Issues TEST";
     title.style.margin = '15px';
 
-    let notification = document.createElement("h2");
-    notification.innerHTML = "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to 'Windowing mode', and choose 'defer'.";
+    //let notification = document.createElement("h2");
+    //notification.innerHTML = "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to 'Windowing mode', and choose 'defer'.";
 
 
     this.node.appendChild(title);
-    this.node.appendChild(notification);
+    //this.node.appendChild(notification);
     this.node.appendChild(this._listCells);
   }
 
