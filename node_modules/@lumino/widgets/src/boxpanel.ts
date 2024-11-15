@@ -17,7 +17,7 @@ import { Widget } from './widget';
  * A panel which arranges its widgets in a single row or column.
  *
  * #### Notes
- * This class provides a convenience wrapper around a [[BoxLayout]].
+ * This class provides a convenience wrapper around a {@link BoxLayout}.
  */
 export class BoxPanel extends Panel {
   /**
@@ -28,9 +28,6 @@ export class BoxPanel extends Panel {
   constructor(options: BoxPanel.IOptions = {}) {
     super({ layout: Private.createLayout(options) });
     this.addClass('lm-BoxPanel');
-    /* <DEPRECATED> */
-    this.addClass('p-BoxPanel');
-    /* </DEPRECATED> */
   }
 
   /**
@@ -92,9 +89,6 @@ export class BoxPanel extends Panel {
    */
   protected onChildAdded(msg: Widget.ChildMessage): void {
     msg.child.addClass('lm-BoxPanel-child');
-    /* <DEPRECATED> */
-    msg.child.addClass('p-BoxPanel-child');
-    /* </DEPRECATED> */
   }
 
   /**
@@ -102,9 +96,6 @@ export class BoxPanel extends Panel {
    */
   protected onChildRemoved(msg: Widget.ChildMessage): void {
     msg.child.removeClass('lm-BoxPanel-child');
-    /* <DEPRECATED> */
-    msg.child.removeClass('p-BoxPanel-child');
-    /* </DEPRECATED> */
   }
 }
 
