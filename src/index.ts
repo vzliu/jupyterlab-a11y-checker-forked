@@ -556,10 +556,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     
 
-    // Show the notification once JupyterLab is fully ready
-    app.restored.then(() => {
-      showStartupNotification();
-    });
 
     let isEnabled = true;
     // Function to toggle the isEnabled state
