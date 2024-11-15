@@ -106,7 +106,7 @@
     "extension": true,
     "outputDir": "jupyterlab_a11y_checker/labextension",
     "_build": {
-      "load": "static/remoteEntry.1d5e9d935b13582b1435.js",
+      "load": "static/remoteEntry.af3b49980ccd8c120ede.js",
       "extension": "./extension",
       "style": "./style"
     }
