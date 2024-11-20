@@ -643,7 +643,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/application@npm:^4.2.5":
+"@jupyterlab/application@npm:^4.3.0":
   version: 4.3.0
   resolution: "@jupyterlab/application@npm:4.3.0"
   dependencies:
@@ -671,7 +671,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/apputils@npm:^4.2.5, @jupyterlab/apputils@npm:^4.4.0":
+"@jupyterlab/apputils@npm:^4.4.0":
   version: 4.4.0
   resolution: "@jupyterlab/apputils@npm:4.4.0"
   dependencies:
@@ -755,7 +755,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/cells@npm:^4.2.5, @jupyterlab/cells@npm:^4.3.0":
+"@jupyterlab/cells@npm:^4.3.0":
   version: 4.3.0
   resolution: "@jupyterlab/cells@npm:4.3.0"
   dependencies:
@@ -1016,7 +1016,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/notebook@npm:^4.2.5":
+"@jupyterlab/notebook@npm:^4.3.0":
   version: 4.3.0
   resolution: "@jupyterlab/notebook@npm:4.3.0"
   dependencies:
@@ -1222,7 +1222,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/ui-components@npm:^4.2.5, @jupyterlab/ui-components@npm:^4.3.0":
+"@jupyterlab/ui-components@npm:^4.2.1, @jupyterlab/ui-components@npm:^4.3.0":
   version: 4.3.0
   resolution: "@jupyterlab/ui-components@npm:4.3.0"
   dependencies:
@@ -4316,14 +4316,14 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "jupyterlab-a11y-checker@workspace:."
   dependencies:
-    "@jupyterlab/application": "npm:^4.2.5"
-    "@jupyterlab/apputils": "npm:^4.2.5"
+    "@jupyterlab/application": "npm:^4.3.0"
+    "@jupyterlab/apputils": "npm:^4.4.0"
     "@jupyterlab/builder": "npm:^4.0.0"
-    "@jupyterlab/cells": "npm:^4.2.5"
+    "@jupyterlab/cells": "npm:^4.3.0"
     "@jupyterlab/mainmenu": "npm:^4.2.1"
     "@jupyterlab/nbformat": "npm:^4.1.2"
-    "@jupyterlab/notebook": "npm:^4.2.5"
-    "@jupyterlab/ui-components": "npm:^4.2.5"
+    "@jupyterlab/notebook": "npm:^4.3.0"
+    "@jupyterlab/ui-components": "npm:^4.2.1"
     "@lumino/disposable": "npm:^2.1.2"
     "@lumino/widgets": "npm:^2.5.0"
     "@types/json-schema": "npm:^7.0.11"
