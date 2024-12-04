@@ -1,11 +1,38 @@
-import { ILabShell } from '@jupyterlab/application';
-import { INotebookTracker } from '@jupyterlab/notebook';
-import { ToolbarButton } from '@jupyterlab/apputils';
-import { Widget } from '@lumino/widgets';
-import { LabIcon } from '@jupyterlab/ui-components';
-import { MarkdownCell } from '@jupyterlab/cells';
+"use strict";
+(self["webpackChunkjupyterlab_a11y_checker"] = self["webpackChunkjupyterlab_a11y_checker"] || []).push([["lib_index_js"],{
+
+/***/ "./lib/index.js":
+/*!**********************!*\
+  !*** ./lib/index.js ***!
+  \**********************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
+/* harmony export */ });
+/* harmony import */ var _jupyterlab_application__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @jupyterlab/application */ "webpack/sharing/consume/default/@jupyterlab/application");
+/* harmony import */ var _jupyterlab_application__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_application__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _jupyterlab_notebook__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @jupyterlab/notebook */ "webpack/sharing/consume/default/@jupyterlab/notebook");
+/* harmony import */ var _jupyterlab_notebook__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_notebook__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _jupyterlab_apputils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @jupyterlab/apputils */ "webpack/sharing/consume/default/@jupyterlab/apputils");
+/* harmony import */ var _jupyterlab_apputils__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_apputils__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _lumino_widgets__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @lumino/widgets */ "webpack/sharing/consume/default/@lumino/widgets");
+/* harmony import */ var _lumino_widgets__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_lumino_widgets__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @jupyterlab/ui-components */ "webpack/sharing/consume/default/@jupyterlab/ui-components");
+/* harmony import */ var _jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony import */ var _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @jupyterlab/cells */ "webpack/sharing/consume/default/@jupyterlab/cells");
+/* harmony import */ var _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! tesseract.js */ "webpack/sharing/consume/default/tesseract.js/tesseract.js");
+/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(tesseract_js__WEBPACK_IMPORTED_MODULE_6__);
+
+
+
+
+
+
 // import ColorThief from 'colorthief';
-import Tesseract from 'tesseract.js';
+
 //import OpenAI from "openai";
 function calculateContrast(foregroundHex, backgroundHex) {
     //convert hex string to tuple of rgb
@@ -41,7 +68,7 @@ function calculateContrast(foregroundHex, backgroundHex) {
     }
 }
 async function determineTextColor(imageData, imagePath, scale) {
-    const result = await Tesseract.recognize(imagePath, 'eng', {});
+    const result = await tesseract_js__WEBPACK_IMPORTED_MODULE_6___default().recognize(imagePath, 'eng', {});
     const words = result.data.words;
     if (words.length === 0) {
         throw new Error('No text found in the image');
@@ -392,7 +419,7 @@ function applyVisualIndicator(altCellList, cell, listIssues) {
     // altCellList.showOnlyVisibleCells();
 }
 async function addToolbarButton(labShell, altCellList, notebookPanel, isEnabled, toggleEnabled, myPath) {
-    const button = new ToolbarButton({
+    const button = new _jupyterlab_apputils__WEBPACK_IMPORTED_MODULE_2__.ToolbarButton({
         label: '🌐 a11y Checker',
         onClick: () => {
             toggleEnabled();
@@ -445,7 +472,7 @@ function applyToAllCells(notebookPanel) {
     //accessing notebook from panel
     const notebook = notebookPanel.content;
     notebook.widgets.forEach(cell => {
-        if (cell instanceof MarkdownCell) {
+        if (cell instanceof _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__.MarkdownCell) {
             checkAndInsertH1Header(cell);
         }
     });
@@ -454,7 +481,7 @@ function applyToAllCells(notebookPanel) {
 const plugin = {
     id: 'jupyterlab_accessibility:plugin',
     autoStart: true,
-    requires: [INotebookTracker, ILabShell],
+    requires: [_jupyterlab_notebook__WEBPACK_IMPORTED_MODULE_1__.INotebookTracker, _jupyterlab_application__WEBPACK_IMPORTED_MODULE_0__.ILabShell],
     activate: (app, notebookTracker, labShell) => {
         console.log('JupyterLab extension jupyterlab_accessibility is activated!');
         let isEnabled = true;
@@ -464,7 +491,7 @@ const plugin = {
             console.log(`Accessibility checks ${isEnabled ? 'enabled' : 'disabled'}.`);
         };
         //icon for the sidebar
-        const accessibilityIcon = new LabIcon({
+        const accessibilityIcon = new _jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4__.LabIcon({
             name: 'accessibility',
             svgstr: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="#154F92" d="M256 48c114.953 0 208 93.029 208 208 0 114.953-93.029 208-208 208-114.953 0-208-93.029-208-208 0-114.953 93.029-208 208-208m0-40C119.033 8 8 119.033 8 256s111.033 248 248 248 248-111.033 248-248S392.967 8 256 8zm0 56C149.961 64 64 149.961 64 256s85.961 192 192 192 192-85.961 192-192S362.039 64 256 64zm0 44c19.882 0 36 16.118 36 36s-16.118 36-36 36-36-16.118-36-36 16.118-36 36-36zm117.741 98.023c-28.712 6.779-55.511 12.748-82.14 15.807.851 101.023 12.306 123.052 25.037 155.621 3.617 9.26-.957 19.698-10.217 23.315-9.261 3.617-19.699-.957-23.316-10.217-8.705-22.308-17.086-40.636-22.261-78.549h-9.686c-5.167 37.851-13.534 56.208-22.262 78.549-3.615 9.255-14.05 13.836-23.315 10.217-9.26-3.617-13.834-14.056-10.217-23.315 12.713-32.541 24.185-54.541 25.037-155.621-26.629-3.058-53.428-9.027-82.141-15.807-8.6-2.031-13.926-10.648-11.895-19.249s10.647-13.926 19.249-11.895c96.686 22.829 124.283 22.783 220.775 0 8.599-2.03 17.218 3.294 19.249 11.895 2.029 8.601-3.297 17.219-11.897 19.249z"/></svg>'
         });
@@ -522,7 +549,7 @@ const plugin = {
     }
 };
 //html styling/logic for rendering the side bar
-class AltCellList extends Widget {
+class AltCellList extends _lumino_widgets__WEBPACK_IMPORTED_MODULE_3__.Widget {
     constructor(notebookTracker) {
         super();
         this._cellMap = new Map();
@@ -739,5 +766,10 @@ class AltCellList extends Widget {
         });
     }
 }
-export default plugin;
-//# sourceMappingURL=index.js.map
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (plugin);
+
+
+/***/ })
+
+}]);
+//# sourceMappingURL=lib_index_js.dd39455b2725fc43b06d.js.map

@@ -4,7 +4,7 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 
-import { INotebookTracker, Notebook, NotebookPanel} from '@jupyterlab/notebook';
+import { INotebookTracker, Notebook, NotebookPanel } from '@jupyterlab/notebook';
 import { ToolbarButton } from '@jupyterlab/apputils';
 import { IDisposable } from '@lumino/disposable';
 import { Widget } from '@lumino/widgets';
@@ -12,7 +12,7 @@ import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 // import ColorThief from 'colorthief';
 import Tesseract from 'tesseract.js';
-import OpenAI from "openai";
+//import OpenAI from "openai";
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
 
@@ -295,6 +295,7 @@ async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string)
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string, firstTime: boolean) {
   const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
+  let h1Exists = false;
 
   notebookContent.widgets.forEach(async cell => {
     if (isEnabled()){
@@ -319,13 +320,34 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
           const level = match[1].length;  // The level is determined by the number of '#'
           headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell});
+          if (level === 1) h1Exists = true;
         }
 
         while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
           const level = parseInt(match[1]);  // The level is directly captured by the regex
           headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
+          if (level === 1) h1Exists = true;
+
         }
       }
+
+      // Check for missing h1 and insert a header if missing
+      /*if (notebookContent.model) {
+        if (!h1Exists) {
+          const newH1Cell = notebookContent.contentFactory.createMarkdownCell({rendermime, model, contentFactory});
+          newH1Cell.model.sharedModel.setSource("# Header 1\n\n");
+      
+          // Insert the cell at the top of the notebook
+          //notebookContent.model.cells.insert(0, newH1Cell);
+      
+          // Apply a visual indicator to the newly inserted cell
+          applyVisualIndicator(altCellList, newH1Cell, ["Added missing h1 header"]);
+      
+          console.log("added missing h1 header to the notebook");
+        }
+      } else {
+        console.error("The notebook model is currently empty/null");
+      }*/
 
       if (headingsMap.length > 0){
         let previousLevel = headingsMap[0].headingLevel;
@@ -402,7 +424,7 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   for (let i = 0; i < listIssues.length; i++) {
     //cases for all 4 types of errors
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
-      altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
+      altCellList.addCell(cell.model.id, "Heading format: Expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
       applyIndic = true;
     } else if(listIssues[i].split(" ")[1] == "contrast"){
       var score = Number(listIssues[i].split(" ")[0]);
@@ -445,74 +467,6 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   }
   // altCellList.showOnlyVisibleCells();
 }
-
-
-//START HERE
-
-//NOTIFICATIONS
-// Define the base URL for your JupyterLab server
-const baseUrl = "http://localhost:8888/lab/"; // Update with your server's URL if needed
-// Notification details
-const notificationData = {
-    origin: "notification",  // Unique name for your extension or use case
-    title: "Test",
-    body: "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to “Windowing mode”, and choose defer",
-    subject: "notification",
-    recipient: ["*"],  // Send to all users
-    ephemeral: true,  // True for non-persistent notifications
-    notifTimeout: 10,  // Timeout in seconds
-    notifType: "completion"  // Type, affects icon and color
-};
-// Function to send notification
-async function sendNotification() {
-    try {
-        const response = await fetch(`${baseUrl}/notifications`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(notificationData)
-        });
-        if (response.ok) {
-            const data = await response.json();
-            console.log("Notification sent successfully:", data);
-        } else {
-            const errorData = await response.json();
-            console.error("Failed to send notification:", response.status, errorData);
-        }
-    } catch (error) {
-        console.error("Error:", error);
-    }
-}
-// Call the function to send the notification
-sendNotification();
-
-
-
-//CHATGPT API
-const openai = new OpenAI({
-  organization: "org-dHYOUEmDKexcHR4shmgPyZjE",
-  project: "$PROJECT_ID",
-});
-//first pass in an image locally into openai API and see what text it outputs
-//START HERE
-//function const openai = new OpenAI();
-
-async function gptTest() {
-  const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: "Say this is a test" }],
-      stream: true,
-
-  });
-  for await (const chunk of stream) {
-      process.stdout.write(chunk.choices[0]?.delta?.content || "");
-  }
-}
-
-gptTest();
-//console.log();
-
 
 
 async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, notebookPanel: NotebookPanel, isEnabled: () => boolean, toggleEnabled: () => void, myPath: string): Promise<IDisposable> {
@@ -585,7 +539,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
             if (args.type === 'add') {
               args.newValues.forEach(async (cellModel: ICellModel) => {
                 const cell = content.widgets.find(c => c.model.id === cellModel.id);
-                if(cell){
+                if(cell){[]
                   const newCell = cell as Cell
                   attachContentChangedListener(content, altCellList, newCell, () => isEnabled, notebookTracker.currentWidget!.context.path);
                   await checkAllCells(content, altCellList, () => isEnabled, notebookTracker.currentWidget!.context.path, true)
@@ -616,6 +570,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   }
 };
 
+
 //html styling/logic for rendering the side bar
 class AltCellList extends Widget {
 
@@ -630,17 +585,89 @@ class AltCellList extends Widget {
     this._notebookTracker = notebookTracker;
 
     let title = document.createElement('h2');
-    title.innerHTML = "Cells with Accessibility Issues TEST";
+    title.innerHTML = "Cells with Accessibility Issues";
     title.style.margin = '15px';
 
-    //let notification = document.createElement("h2");
-    //notification.innerHTML = "Attention! The jupyterlab-a11y-checker is known to have navigation issues for 4.2.5 or later. To fix this, please navigate to Settings → Settings Editor → Notebook, scroll to 'Windowing mode', and choose 'defer'.";
 
+    const listItemWrapper = document.createElement('div');
+
+    const listItem = document.createElement('div');
+    listItem.style.display = 'flex';
+    listItem.style.alignItems = 'center';
+    listItem.style.flexWrap = 'nowrap';
+
+    //button
+    const button = document.createElement('button');
+    button.classList.add("jp-toast-button");
+    button.classList.add("jp-mod-small");
+    button.classList.add("jp-Button");
+    button.style.margin = '5px';
+    button.style.marginRight = '5px';
+    button.style.marginLeft = '7px';
+    button.style.flexShrink = '1';
+    button.textContent = "NOTICE: Cell Navigation Issue";
+
+
+    //more information icon
+    const infoIcon = document.createElement('span');
+    infoIcon.innerHTML = '&#9432;';
+    infoIcon.style.cursor = 'pointer';
+    infoIcon.style.marginRight = '5px';
+
+    //dropdown box
+    const dropdown = document.createElement('div');
+    dropdown.style.display = 'none';
+    dropdown.style.marginLeft = '10px';
+    dropdown.style.marginRight = '10px';
+    dropdown.style.backgroundColor = 'white';
+    dropdown.style.border = '1px solid black';
+    dropdown.style.padding = '5px';
+    const dropDownText = document.createElement('p');
+    dropDownText.textContent = "The jupyterlab-a11y-checker has a known cell navigation issue for Jupyterlab version 4.2.5 or later. To fix this, please navigate to 'Settings' → 'Settings Editor' → Notebook, scroll down to 'Windowing mode', and choose 'defer' from the dropdown. Please note that this option may reduce the performance of the application. For more information, please see the";
+    dropDownText.style.color = "black";
+    dropdown.appendChild(dropDownText);
+    
+    const link = document.createElement('a');
+    link.href = "https://jupyter-notebook.readthedocs.io/en/stable/changelog.html";
+    link.textContent = "Jupyter Notebook changelog.";
+    link.style.color = "#069";
+    link.style.textDecoration = "underline";
+    link.target = "_blank";
+    dropdown.appendChild(link);
+
+    // Toggle dropdown on info icon click
+    infoIcon.addEventListener('click', () => {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Dismiss button to dismiss the Navigaton Issue notification
+    const dismissButton = document.createElement('button');
+    dismissButton.textContent = "Dismiss";
+    dismissButton.style.backgroundColor = 'black';
+    dismissButton.style.color = 'white';
+    dismissButton.style.border = 'none';
+    dismissButton.style.borderRadius = '5px';
+    dismissButton.style.cursor = 'pointer';
+    dismissButton.style.marginTop = '10px';
+    dismissButton.style.marginLeft = '75px';
+
+    // Remove the Navigation Issue notification on click
+    dismissButton.addEventListener('click', () => {
+      listItemWrapper.remove();
+    })
+    dropdown.appendChild(dismissButton);
+
+
+    listItem.appendChild(button);
+    listItem.appendChild(infoIcon);
+    listItemWrapper.appendChild(listItem)
+    listItemWrapper.appendChild(dropdown);
+    this._listCells.appendChild(listItemWrapper);
 
     this.node.appendChild(title);
-    //this.node.appendChild(notification);
     this.node.appendChild(this._listCells);
   }
+
 
   //add a button that would navigate to the cell having the issue
   addCell(cellId: string, buttonContent: string): void {

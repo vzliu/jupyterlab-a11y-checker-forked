@@ -703,7 +703,7 @@
             "openai": {},
             "tesseract.js": {},
             "jupyterlab-a11y-checker": {
-              "version": "0.1.2",
+              "version": "0.1.3",
               "singleton": true,
               "import": "/Users/vivianliu/Desktop/a11y-extension/jupyterlab-a11y-checker-forked/lib/index.js"
             }
