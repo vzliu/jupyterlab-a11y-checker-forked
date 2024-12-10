@@ -21,11 +21,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lumino_widgets__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_lumino_widgets__WEBPACK_IMPORTED_MODULE_3__);
 /* harmony import */ var _jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @jupyterlab/ui-components */ "webpack/sharing/consume/default/@jupyterlab/ui-components");
 /* harmony import */ var _jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_ui_components__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony import */ var _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! @jupyterlab/cells */ "webpack/sharing/consume/default/@jupyterlab/cells");
-/* harmony import */ var _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! tesseract.js */ "webpack/sharing/consume/default/tesseract.js/tesseract.js");
-/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(tesseract_js__WEBPACK_IMPORTED_MODULE_6__);
-
+/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! tesseract.js */ "webpack/sharing/consume/default/tesseract.js/tesseract.js");
+/* harmony import */ var tesseract_js__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(tesseract_js__WEBPACK_IMPORTED_MODULE_5__);
 
 
 
@@ -68,7 +65,7 @@ function calculateContrast(foregroundHex, backgroundHex) {
     }
 }
 async function determineTextColor(imageData, imagePath, scale) {
-    const result = await tesseract_js__WEBPACK_IMPORTED_MODULE_6___default().recognize(imagePath, 'eng', {});
+    const result = await tesseract_js__WEBPACK_IMPORTED_MODULE_5___default().recognize(imagePath, 'eng', {});
     const words = result.data.words;
     if (words.length === 0) {
         throw new Error('No text found in the image');
@@ -279,6 +276,7 @@ async function checkCodeCellForImageWithAccessIssues(cell, myPath) {
 }
 async function checkAllCells(notebookContent, altCellList, isEnabled, myPath, firstTime) {
     const headingsMap = [];
+    //let h1Exists = false;
     notebookContent.widgets.forEach(async (cell) => {
         if (isEnabled()) {
             if (firstTime) {
@@ -299,12 +297,31 @@ async function checkAllCells(notebookContent, altCellList, isEnabled, myPath, fi
                 while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
                     const level = match[1].length; // The level is determined by the number of '#'
                     headingsMap.push({ headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
+                    //if (level === 1) h1Exists = true;
                 }
                 while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
                     const level = parseInt(match[1]); // The level is directly captured by the regex
                     headingsMap.push({ headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
+                    //if (level === 1) h1Exists = true;
                 }
             }
+            // Check for missing h1 and insert a header if missing
+            /*if (notebookContent.model) {
+              if (!h1Exists) {
+                const newH1Cell = notebookContent.contentFactory.createMarkdownCell({rendermime, model, contentFactory});
+                newH1Cell.model.sharedModel.setSource("# Header 1\n\n");
+            
+                // Insert the cell at the top of the notebook
+                //notebookContent.model.cells.insert(0, newH1Cell);
+            
+                // Apply a visual indicator to the newly inserted cell
+                applyVisualIndicator(altCellList, newH1Cell, ["Added missing h1 header"]);
+            
+                console.log("added missing h1 header to the notebook");
+              }
+            } else {
+              console.error("The notebook model is currently empty/null");
+            }*/
             if (headingsMap.length > 0) {
                 let previousLevel = headingsMap[0].headingLevel;
                 let highestLevel = previousLevel;
@@ -440,44 +457,6 @@ async function addToolbarButton(labShell, altCellList, notebookPanel, isEnabled,
     elem.style.backgroundColor = '#0000';
     return button;
 }
-//NEW CODE
-// check if there's an h1 header in the markdown cell and if not, insert
-function checkAndInsertH1Header(cell) {
-    const cellText = cell.model.toJSON().source.toString(); // Get content
-    const h1HeaderRegex = /^(#+)\s*(.*)$/gm;
-    let foundH1 = false;
-    let match;
-    // Check if any h1 headers exist
-    while ((match = h1HeaderRegex.exec(cellText)) !== null) {
-        if (match[1].length === 1) { // h1 headers are represented by a single '#'
-            foundH1 = true;
-            break;
-        }
-    }
-    // If no h1 header is found, insert one and prompt the user
-    if (!foundH1) {
-        //const newTitle = prompt('No h1 header found. Please provide a title for the document:');
-        console.log("No h1 header found");
-        /*if (newTitle) {
-          // Prepend the h1 header to the existing content
-          const newContent = `# ${newTitle}\n\n${cellText}`;
-          
-          // Update the content directly using model.source
-          cell.model.toJSON().source = newContent; // Update the markdown cell's content
-        }*/
-    }
-}
-// apply to a MarkdownCell
-function applyToAllCells(notebookPanel) {
-    //accessing notebook from panel
-    const notebook = notebookPanel.content;
-    notebook.widgets.forEach(cell => {
-        if (cell instanceof _jupyterlab_cells__WEBPACK_IMPORTED_MODULE_5__.MarkdownCell) {
-            checkAndInsertH1Header(cell);
-        }
-    });
-}
-//END OF NEW CODE
 const plugin = {
     id: 'jupyterlab_accessibility:plugin',
     autoStart: true,
@@ -503,7 +482,6 @@ const plugin = {
         notebookTracker.currentChanged.connect((sender, notebookPanel) => {
             if (!notebookPanel)
                 return;
-            applyToAllCells(notebookPanel);
             notebookPanel.context.ready.then(() => {
                 const { content } = notebookPanel;
                 //for each existing cell, attach a content changed listener
@@ -772,4 +750,4 @@ class AltCellList extends _lumino_widgets__WEBPACK_IMPORTED_MODULE_3__.Widget {
 /***/ })
 
 }]);
-//# sourceMappingURL=lib_index_js.dd39455b2725fc43b06d.js.map
+//# sourceMappingURL=lib_index_js.e8e2b1cee9d88b619c32.js.map

@@ -1,5 +1,0 @@
-{
-  "packageManager": "python",
-  "packageName": "jupyter a11y extension",
-  "uninstallInstructions": "Use your Python package manager (pip, conda, etc.) to uninstall the package jupyter a11y extension"
-}

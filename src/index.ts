@@ -295,7 +295,7 @@ async function checkCodeCellForImageWithAccessIssues(cell: Cell, myPath: string)
 
 async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList, isEnabled: () => boolean, myPath: string, firstTime: boolean) {
   const headingsMap: Array<{headingLevel: number, myCell: Cell, heading: string }> = [];
-  let h1Exists = false;
+  //let h1Exists = false;
 
   notebookContent.widgets.forEach(async cell => {
     if (isEnabled()){
@@ -320,13 +320,13 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         while ((match = markdownHeadingRegex.exec(cellText)) !== null) {
           const level = match[1].length;  // The level is determined by the number of '#'
           headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell});
-          if (level === 1) h1Exists = true;
+          //if (level === 1) h1Exists = true;
         }
 
         while ((match = htmlHeadingRegex.exec(cellText)) !== null) {
           const level = parseInt(match[1]);  // The level is directly captured by the regex
           headingsMap.push({headingLevel: level, heading: `${match[2].trim()}`, myCell: mCell });
-          if (level === 1) h1Exists = true;
+          //if (level === 1) h1Exists = true;
 
         }
       }

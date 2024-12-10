@@ -124,7 +124,7 @@ __webpack_require__.d(exports, {
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "" + chunkId + "." + {"lib_index_js":"dd39455b2725fc43b06d","style_index_js":"382bc657a9e7d933ea12","vendors-node_modules_tesseract_js_src_index_js":"6e26b2c758b7b6e650d3"}[chunkId] + ".js";
+/******/ 			return "" + chunkId + "." + {"lib_index_js":"e8e2b1cee9d88b619c32","style_index_js":"382bc657a9e7d933ea12","vendors-node_modules_tesseract_js_src_index_js":"6e26b2c758b7b6e650d3"}[chunkId] + ".js";
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -406,7 +406,6 @@ __webpack_require__.d(exports, {
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/apputils": () => (loadSingletonVersion("default", "@jupyterlab/apputils", false, [1,4,3,5])),
 /******/ 			"webpack/sharing/consume/default/@lumino/widgets": () => (loadSingletonVersion("default", "@lumino/widgets", false, [1,2,3,1,,"alpha",0])),
 /******/ 			"webpack/sharing/consume/default/@jupyterlab/ui-components": () => (loadSingletonVersion("default", "@jupyterlab/ui-components", false, [1,4,2,5])),
-/******/ 			"webpack/sharing/consume/default/@jupyterlab/cells": () => (loadVersion("default", "@jupyterlab/cells", false, [1,4,2,5])),
 /******/ 			"webpack/sharing/consume/default/tesseract.js/tesseract.js": () => (loadStrictVersion("default", "tesseract.js", false, [1,5,1,0], () => (__webpack_require__.e("vendors-node_modules_tesseract_js_src_index_js").then(() => (() => (__webpack_require__(/*! tesseract.js */ "./node_modules/tesseract.js/src/index.js")))))))
 /******/ 		};
 /******/ 		// no consumes in initial chunks
@@ -417,7 +416,6 @@ __webpack_require__.d(exports, {
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/apputils",
 /******/ 				"webpack/sharing/consume/default/@lumino/widgets",
 /******/ 				"webpack/sharing/consume/default/@jupyterlab/ui-components",
-/******/ 				"webpack/sharing/consume/default/@jupyterlab/cells",
 /******/ 				"webpack/sharing/consume/default/tesseract.js/tesseract.js"
 /******/ 			]
 /******/ 		};
@@ -559,4 +557,4 @@ __webpack_require__.d(exports, {
 /******/ 	
 /******/ })()
 ;
-//# sourceMappingURL=remoteEntry.34ed434e88187e94d343.js.map
+//# sourceMappingURL=remoteEntry.d49348fdf6c15b61fceb.js.map

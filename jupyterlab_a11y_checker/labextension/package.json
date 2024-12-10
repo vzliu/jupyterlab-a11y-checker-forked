@@ -13,7 +13,7 @@
   },
   "license": "BSD-3-Clause",
   "author": {
-    "name": "Shreyas Rana",
+    "name": "Shreyas Rana, Vivian Liu",
     "email": "me@test.com"
   },
   "files": [
@@ -106,7 +106,7 @@
     "extension": true,
     "outputDir": "jupyterlab_a11y_checker/labextension",
     "_build": {
-      "load": "static/remoteEntry.34ed434e88187e94d343.js",
+      "load": "static/remoteEntry.d49348fdf6c15b61fceb.js",
       "extension": "./extension",
       "style": "./style"
     }
