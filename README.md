@@ -113,6 +113,39 @@ twine upload your-package.whl
 pip uninstall jupyterlab_a11y_checker
 ```
 
+### Testing in a JupyterHub setup
+
+- Build the Jupyter Lab extension with the latest changes
+
+```bash
+jlpm 
+jlpm build
+jupyter lab build
+```
+- Package the extension as a wheel file (.whl)
+
+```bash
+python -m build
+```
+.whl file gets generated in the `dist/` directory
+
+- Copy the .whl file to the server where JupyterHub is installed (or include it in a Dockerfile if using Docker)
+
+- Install the .whl file:
+
+```bash
+pip install /path/to/your-extension.whl
+```
+
+- If the identical version of the extension is already installed then
+
+```bash
+pip uninstall extension-name
+pip install /path/to/your-extension.whl
+```
+
+- Refresh the page for the changes to apply
+
 In development mode, you will also need to remove the symlink created by `jupyter labextension develop`
 command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
 folder is located. Then you can remove the symlink named `jupyterlab-a11y-checker` within that folder.
