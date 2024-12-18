@@ -118,14 +118,14 @@ pip uninstall jupyterlab_a11y_checker
 - Build the Jupyter Lab extension with the latest changes
 
 ```bash
+jlpm 
 jlpm build
-jupyter labextension build
+jupyter lab build
 ```
 - Package the extension as a wheel file (.whl)
 
 ```bash
-pip install setuptools wheel
-python setup.py bdist_wheel
+python -m build
 ```
 .whl file gets generated in the `dist/` directory
 
@@ -134,6 +134,13 @@ python setup.py bdist_wheel
 - Install the .whl file:
 
 ```bash
+pip install /path/to/your-extension.whl
+```
+
+- If the identical version of the extension is already installed then
+
+```bash
+pip uninstall extension-name
 pip install /path/to/your-extension.whl
 ```
 
