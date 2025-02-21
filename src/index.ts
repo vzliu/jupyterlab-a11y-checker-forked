@@ -12,6 +12,7 @@ import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 // import ColorThief from 'colorthief';
 import Tesseract from 'tesseract.js';
+import axe from 'axe-core';
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
 
@@ -305,6 +306,7 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
         var issues = mdCellIssues.concat(codeCellHasTransparency);
         applyVisualIndicator(altCellList, cell, issues);
+        addErrors(altCellList);
       }
       
       //header ordering checking
@@ -359,10 +361,12 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
           //remove any issues in the heading cell which has an error before adding the heading errors
           applyVisualIndicator(altCellList, e.myCell, [])
           applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
+          addErrors(altCellList);
         });
       }
     } else {
       applyVisualIndicator(altCellList, cell, []);
+
     }
   });
 
@@ -376,11 +380,10 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
         break; 
       }
     }
-  
-    //console.log("No h1 header in notebook detected");
   }
 
   altCellList.showOnlyVisibleCells();
+  //addErrors(altCellList);
 }
 
 async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
@@ -395,8 +398,8 @@ async function attachContentChangedListener(notebookContent: Notebook, altCellLi
     const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
     var issues = mdCellIssues.concat(codeCellHasTransparency);
     applyVisualIndicator(altCellList, cell, issues);
-  });
-  
+    addErrors(altCellList);
+  });  
 }
 
 function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: string[]) {
@@ -420,25 +423,30 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   for (let i = 0; i < listIssues.length; i++) {
     //cases for all 4 types of errors
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
-      altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
+      //altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
+      altCellList._errorCategoryMap.get("Header Errors")?.add(cell.model.id + "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
       applyIndic = true;
     } else if(listIssues[i].split(" ")[1] == "contrast"){
       var score = Number(listIssues[i].split(" ")[0]);
       if (score < 4.5) {
-        altCellList.addCell(cell.model.id, "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
+        //altCellList.addCell(cell.model.id, "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
+        altCellList._errorCategoryMap.get("Contrast Errors")?.add(cell.model.id + "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
         applyIndic = true;
       }
     } else if (listIssues[i] == "Alt") {
-      altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
+      //altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
+      altCellList._errorCategoryMap.get("Alt Text Errors")?.add(cell.model.id + "Cell Error: Missing Alt Tag");
       applyIndic = true;
     } else if (listIssues[i] == "h1 header") {
-      altCellList.addCell(cell.model.id, "Header format: Missing h1 header");
+      //altCellList.addCell(cell.model.id, "Header format: Missing h1 Header");
+      altCellList._errorCategoryMap.get("Header Errors")?.add(cell.model.id + "Header format: Missing h1 header");
       applyIndic = true;
     } 
     else {
       var score = Number(listIssues[i].split(" ")[0]);
       if (score < 9) {
-        altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
+        //altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
+        altCellList._errorCategoryMap.get("Transparency Errors")?.add(cell.model.id + "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
         applyIndic = true;
       }
     }
@@ -466,6 +474,25 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
     altCellList.removeCell(cell.model.id);
   }
   // altCellList.showOnlyVisibleCells();
+}
+
+function addErrors(altCellList: AltCellList) {
+  altCellList._errorCategoryMap.forEach((errorsSet, section) => {
+    //console.log(`Category: ${section}`);
+    if (errorsSet.size > 0) {
+      altCellList.addSection(section);
+      errorsSet.forEach(error => {
+        console.log("ERROS SER");
+        console.log(errorsSet);
+          //console.log(`  - ${section}`);
+          //console.log(error.slice(36));
+          altCellList.addCell(error.slice(0, 36), error.slice(36));
+      });
+    }
+
+  });
+  console.log("Category Map");
+  console.log(altCellList._errorCategoryMap);
 }
 
 async function addToolbarButton(labShell: ILabShell, altCellList: AltCellList, notebookPanel: NotebookPanel, isEnabled: () => boolean, toggleEnabled: () => void, myPath: string): Promise<IDisposable> {
@@ -556,7 +583,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         notebookTracker.currentWidget?.context.ready.then(() => {
           try{
             console.log("trying to add toolbar button");
-            console.log(notebookTracker.currentWidget!)
+            //console.log(notebookTracker.currentWidget!)
             addToolbarButton(labShell, altCellList, notebookPanel, () => isEnabled, toggleEnabled, notebookTracker.currentWidget!.context.path);
             console.log("able to add toolbar button");
           } catch {
@@ -577,30 +604,8 @@ class AltCellList extends Widget {
   private _notebookTracker: INotebookTracker;
 
   // add sections for grouping buttons to make side bar UI nicer
-  private _sections: Map<string, HTMLElement>;
-
-  //keep track of error groups
-  private _errorCategoryMap: Map<string, Set<string>> = new Map();
-
-  private initializeErrorSectionsMap(): void {
-    this._errorCategoryMap.set("Header Errors", new Set());
-    this._errorCategoryMap.set("Alt Text Errors", new Set());
-    this._errorCategoryMap.set("Contrast Errors", new Set());
-    this._errorCategoryMap.set("Transparency Errors", new Set());
-  }
-
-  //booleans for the different types of headers
-  private _headerErrors: boolean; 
-  private _headerErrorAdded: boolean; //to prevent duplicate headers
-
-  private _altErrors: boolean; 
-  private _altErrorAdded: boolean; 
-
-  private _transparencyErrors: boolean; 
-  private _transparencyErrorAdded: boolean; 
-
-  private _contrastErrors: boolean; 
-  private _contrastErrorAdded: boolean; 
+  //_errorCategoryMap: Map<string, Map<string, HTMLElement[]>> = new Map();
+  _errorCategoryMap: Map<string, Set<string>> = new Map();
 
   constructor(notebookTracker: INotebookTracker) {
     super();
@@ -608,24 +613,16 @@ class AltCellList extends Widget {
     this._listCells = document.createElement('div');
     this._notebookTracker = notebookTracker;
 
-    this._sections = new Map();
-    this._headerErrors = false;
-    this._headerErrorAdded = false; 
-    this.initializeErrorSectionsMap();
-
-    this._altErrors = false;
-    this._altErrorAdded = false; 
-
-    this._transparencyErrors = false;
-    this._transparencyErrorAdded = false; 
-
-    this._contrastErrors = false;
-    this._contrastErrorAdded = false; 
-
     // make the side bar scrollable
     this._listCells.style.maxHeight = '580px';
     this._listCells.style.overflowY = 'scroll';
     this._listCells.style.paddingRight = '10px'; 
+
+    // initialize error groups
+    this._errorCategoryMap.set("Header Errors", new Set());
+    this._errorCategoryMap.set("Alt Text Errors", new Set());
+    this._errorCategoryMap.set("Contrast Errors", new Set());
+    this._errorCategoryMap.set("Transparency Errors", new Set());
 
     let title = document.createElement('h2');
     title.innerHTML = "Cells with Accessibility Issues";
@@ -710,19 +707,45 @@ class AltCellList extends Widget {
 
     this.node.appendChild(title);
     this.node.appendChild(this._listCells);
+    //console.log("List Cells");
+    //console.log(this._listCells);
   }
 
+  addSection(sectionName: string): void {
+    const errorSection = document.createElement('div');
+    errorSection.id = sectionName;
 
-  // add a subsection under a given section
-  createSubsection(sectionName: string, subsectionName: string): void {
-    const section = this._sections.get(sectionName);
-    if (section) {
-      const subsection = document.createElement('div');
-      const subsectionTitle = document.createElement('h4');
-      subsectionTitle.innerHTML = subsectionName;
-      subsection.appendChild(subsectionTitle);
-      section.appendChild(subsection);
+    const h1Header = document.createElement('h3');
+    h1Header.textContent = sectionName;
+    h1Header.style.margin = '15px';
+
+
+    // Add header and apply button to the sidebar
+    errorSection.appendChild(h1Header);
+
+    //errorSection.appendChild(applyButton);
+
+    var add = true;
+    //check if this error already exists in the running map, if so do not add it
+    if (this._cellMap.has(sectionName)){
+      //cross check with categorymap, put what is in categorymap into cellmap
+      //var newList = this._errorCategoryMap.get(sectionName);
+
+      //remove duplicates
+      this._cellMap.set(sectionName, [...new Set((this._cellMap.get(sectionName)) || [])]);
+      add = false;
+      
+
+      //existingList!.push(errorSection);
+    } else {
+      this._cellMap.set(sectionName, [errorSection]);
     }
+
+    if (add) {
+      this._listCells.appendChild(errorSection);
+    }
+
+    // Append the section to the sidebar
   }
 
 
@@ -752,25 +775,6 @@ class AltCellList extends Widget {
       this.scrollToCell(cellId);
     });
 
-    // check if error is heading related
-    if (buttonContent.includes("Heading") || buttonContent.includes("h1 header")) {
-      this._headerErrors = true;
-    }
-
-     // check if error is alt related
-     if (buttonContent.includes("Alt")) {
-      this._altErrors = true;  
-    }
-
-     // check if error is contrast related
-     if (buttonContent.includes("Contrast")) {
-      this._contrastErrors = true;  
-    }
-
-     // check if error is transparency related
-     if (buttonContent.includes("Transparency")) {
-      this._transparencyErrors = true;  
-    }
 
     //more information icon
     const infoIcon = document.createElement('span');
@@ -794,7 +798,7 @@ class AltCellList extends Widget {
     inputField.style.width = '100%';
     inputField.style.padding = '5px';
     inputField.style.border = '1px solid #ccc';
-    inputField.style.borderRadius = '4px';
+    inputField.style.borderRadius = '2px';
 
 
     // Add the input field to the container
@@ -817,7 +821,7 @@ class AltCellList extends Widget {
         this.addMissingH1HeaderMarkdownCell(inputText); // Add the markdown cell with the user text
         inputField.value = ''; // Clear the input field after applying
       } else {
-        alert('Please enter some text for the header.'); // Alert if input is empty
+        alert('Please enter header text.'); // Alert if input is empty
       }
 
     });
@@ -879,9 +883,26 @@ class AltCellList extends Widget {
         }
       })
 
-      existingList!.push(listItemWrapper)
-      this._cellMap.set(cellId, existingList!);
-    } else {
+      const cellElements = this._cellMap.get(cellId) ?? [];
+      let isDuplicate = false;
+
+      // itearte through each element in the array
+      for (const el of cellElements) {
+        if (el.id == listItemWrapper.id) {
+          isDuplicate = true;
+          break; // stop early if a match is found
+        }
+      }
+      console.log(isDuplicate ? "Duplicate found!" : "No duplicate.");
+      //if no duplicate, then add to cellmap
+      if (isDuplicate) {
+        console.log(listItemWrapper);
+      }
+      else {
+        existingList!.push(listItemWrapper);
+        this._cellMap.set(cellId, existingList!);
+      }
+    } else { //error doesn't already exist
       this._cellMap.set(cellId, [listItemWrapper]);
     }
 
@@ -895,41 +916,9 @@ class AltCellList extends Widget {
       listItemWrapper.appendChild(listItem)
       listItemWrapper.appendChild(dropdown);
       this._listCells.appendChild(listItemWrapper);
+
     }
 
-    // Add the "Headers Errors" section header if there are header errors
-    if (this._headerErrors && !this._headerErrorAdded) {
-      this.createHeaderErrorSection();
-      this._errorCategoryMap.get("Header Errors")?.add(cellId);
-      this._headerErrorAdded = true; // prevent duplicate headers
-    }
-
-
-     // Add the "Headers Errors" section header if there are header errors
-     if (this._altErrors && !this._altErrorAdded) {
-      //check if the 
-      this.createAltErrorSection();
-      this._errorCategoryMap.get("Alt Text Errors")?.add(cellId);
-      this._altErrorAdded = true; // prevent duplicate headers
-    }
-
-    // Add the "Headers Errors" section header if there are header errors
-    if (this._transparencyErrors && !this._transparencyErrorAdded) {
-      //check if the 
-      this.createTransparencyErrorSection();
-      this._errorCategoryMap.get("Transparency Errors")?.add(cellId);
-      this._transparencyErrorAdded = true; // prevent duplicate headers
-    }
-
-
-    // Add the "Headers Errors" section header if there are header errors
-    if (this._contrastErrors && !this._contrastErrorAdded) {
-      //check if the 
-      this.createContrastErrorSection();
-      this._errorCategoryMap.get("Contrast Errors")?.add(cellId);
-
-      this._contrastErrorAdded = true; // prevent duplicate headers
-    }
 
 
     // this.showOnlyVisibleCells();
@@ -953,80 +942,6 @@ class AltCellList extends Widget {
     notebook.model?.sharedModel.insertCell(0, markdownCell);
   }
 
-  private createHeaderErrorSection(): void {
-    // Create the h1 header
-    const h1Header = document.createElement('h3');
-    h1Header.textContent = "Header Errors";
-    h1Header.style.margin = '15px';
-
-    // Add header and apply button to the sidebar
-    const errorSection = document.createElement('div');
-    errorSection.id = "header-errors-section"; // Assign an ID for later removal
-
-    errorSection.appendChild(h1Header);
-    //errorSection.appendChild(applyButton);
-
-    // Append the section to the sidebar
-    this._listCells.appendChild(errorSection);
-  }
-
-  private createAltErrorSection(): void {
-    // Create the h1 header
-    const altTextHeader = document.createElement('h3');
-    altTextHeader.textContent = "Alt Text Errors";
-    altTextHeader.style.margin = '15px';
-
-    // Add header and apply button to the sidebar
-    const errorSection = document.createElement('div');
-    errorSection.id = "alt-text-errors-section"; // Assign an ID for later removal
-
-    errorSection.appendChild(altTextHeader);
-    //errorSection.appendChild(applyButton);
-
-    // Append the section to the sidebar
-    this._listCells.appendChild(errorSection);
-  }
-
-
-
-
-
-  private createContrastErrorSection(): void {
-    // Create the h1 header
-    const h1Header = document.createElement('h3');
-    h1Header.textContent = "Contrast Errors";
-    h1Header.style.margin = '15px';
-
-    // Add header and apply button to the sidebar
-    const errorSection = document.createElement('div');
-    errorSection.id = "contrast-errors-section"; // Assign an ID for later removal
-
-    errorSection.appendChild(h1Header);
-    //errorSection.appendChild(applyButton);
-
-    // Append the section to the sidebar
-    this._listCells.appendChild(errorSection);
-  }
-
-
-
-  private createTransparencyErrorSection(): void {
-    // Create the h1 header
-    const h1Header = document.createElement('h3');
-    h1Header.textContent = "Transparency Errors";
-    h1Header.style.margin = '15px';
-
-
-    // Add header and apply button to the sidebar
-    const errorSection = document.createElement('div');
-    errorSection.id = "transparency-errors-section"; // Assign an ID for later removal
-    errorSection.appendChild(h1Header);
-    //errorSection.appendChild(applyButton);
-
-    // Append the section to the sidebar
-    this._listCells.appendChild(errorSection);
-  }
-
 
 
 
@@ -1035,33 +950,27 @@ class AltCellList extends Widget {
   removeCell(cellId: string): void {
     //get list of error buttons related to this cell
     const listItem = this._cellMap.get(cellId);
-    //console.log("CELL MAP");
-    //console.log(this._cellMap);
     if (listItem != null){
-      //console.log("LIST ITEMS");
-      //console.log(listItem);
-      
       listItem.forEach((btn) => {
         for (let item of this._listCells.children) {
           if (btn.id == item.id) {
-            console.log("ITEM looks like:");
-            console.log(item.id);
             this._listCells.removeChild(btn);
+            console.log("Removed child", btn);
           }
-          
         }
       });
-
-      
-
-
-      
     }
     if(this._cellMap.has(cellId)){
       this._cellMap.delete(cellId);
     }
 
-    //maybe do the removal here
+    this._cellMap.forEach((elements, key) => {
+      const uniqueElements = Array.from(
+        new Map(elements.map(el => [el.outerHTML, el])).values()
+      );
+      this._cellMap.set(key, uniqueElements);
+    });
+
   }
 
   //scroll to cell once clicked
@@ -1091,88 +1000,54 @@ class AltCellList extends Widget {
   showOnlyVisibleCells(): void {
     console.log("showing only visible cells");
     var keyList = Array.from(this._cellMap.keys());
+    console.log("CELL MAP");
+    console.log(this._cellMap);
+    console.log(this._cellMap instanceof Map); // Should be `true`
+    console.log(this._cellMap.keys()); // Should log an iterable object
+
     const notebookPanel = this._notebookTracker.currentWidget;
     const notebook = notebookPanel!.content;
+    //console.log("NOTEBOOK");
+    //console.log(notebook.widgets);
 
-    keyList.forEach(k => {
-      var cellExists = false;
-      for (let i = 0; i < notebook.widgets.length; i++) {
-        const cell = notebook.widgets[i];
-        if (cell.model.id === k) {
-          cellExists = true;
-          break
+    // iterate through all cells in cellMap, which contains all the accumulated errors
+    setTimeout(() => {
+      console.log("Delayed Keys:", Array.from(this._cellMap.keys()));
+      keyList = Array.from(this._cellMap.keys());
+      keyList.forEach(k => {
+        var cellExists = false;
+        for (let i = 0; i < notebook.widgets.length; i++) {
+          const cell = notebook.widgets[i];
+          // check to see if the error associated with a particular cell is currently in the notebook
+          if (cell.model.id === k) {
+            console.log("REEEEE");
+            console.log(k);
+            cellExists = true;
+            break
+          }
         }
-      }
-      if(!cellExists){
-        this.removeCell(k);        
-      }
-    });
-
-    this._errorCategoryMap.forEach((errorSet, category) => {
-      //console.log("Error Category Map");
-      //console.log([category, errorSet]);
-      for (let i = 0; i < notebook.widgets.length; i++) {
-        const cell = notebook.widgets[i];
-        if (errorSet.has(cell.model.id)) {
-          break
+        if(!cellExists){
+          console.log("REMOVE");
+          console.log(k);
+          this.removeCell(k);        
         }
-        else {
-          errorSet.delete(cell.model.id);
-          //console.log(`Removed cell ID: ${cell.model.id} from category: ${category}`);
+      });  
+
+    }, 5000); // Wait for data to populate
+    
+    axe.run(document.body)
+      .then(results => {
+        if (results.violations.length) {
+          console.error('Accessibility issues found:', results.violations);
+        } else {
+          console.log('No accessibility issues found.');
         }
-
-      }
-    });
-
-    // check and remove h3 element if the associated set is empty
-    this.checkAndRemoveEmptyErrorCategories();
-    console.log("CELL MAP");
-    console.log(this._cellMap);   
+      })
+      .catch(err => {
+        console.error('Something bad happened:', err.message);
+      });
 
   }
-
-  // check for empty error categories and remove h3 elements
-  private checkAndRemoveEmptyErrorCategories(): void {
-    //console.log("Error Map");
-    //console.log(this._errorCategoryMap);
-    console.log(`Current DOM structure:`, this._listCells);
-    this._errorCategoryMap.forEach((errorSet, category) => {
-      console.log("CATEGORY");
-      console.log(category);
-      
-
-      if (errorSet.size === 0) {
-        var sectionId = "";
-        if (category == "Header Errors") {
-          sectionId = "header-errors-section";
-        }
-        if (category == "Alt Text Errors") {
-          sectionId = "alt-text-errors-section";
-        }
-        if (category == "Contrast Errors") {
-          sectionId = "contrast-errors-section";
-        }
-        if (category == "Transparency Errors") {
-          sectionId = "transparency-errors-section";
-        }
-        //console.log(category);
-        //console.log("Section ID: " + sectionId);
-        const sectionElement = document.getElementById(sectionId);
-        console.log("SECTION ELEMENT");
-        console.log(sectionElement);
-        sectionElement?.remove;
-        //this._listCells.removeChild(sectionElement);
-
-        if (sectionElement) {
-          this._listCells.removeChild(sectionElement);
-          //console.log(`Removed section: ${sectionId}`);
-
-        }
-      }
-    });
-  }
-
-
 
 }
 
