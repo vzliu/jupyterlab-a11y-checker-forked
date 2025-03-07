@@ -12,6 +12,7 @@ import { LabIcon } from '@jupyterlab/ui-components';
 import { Cell, CodeCell, ICellModel, MarkdownCell } from '@jupyterlab/cells';
 // import ColorThief from 'colorthief';
 import Tesseract from 'tesseract.js';
+//import { error } from 'console';
 import axe from 'axe-core';
 
 function calculateContrast(foregroundHex: string, backgroundHex: string): number {
@@ -361,7 +362,6 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
           //remove any issues in the heading cell which has an error before adding the heading errors
           applyVisualIndicator(altCellList, e.myCell, [])
           applyVisualIndicator(altCellList, e.myCell, ["heading " + e.current + " " + e.expected]);
-          addErrors(altCellList);
         });
       }
     } else {
@@ -383,7 +383,6 @@ async function checkAllCells(notebookContent: Notebook, altCellList: AltCellList
   }
 
   altCellList.showOnlyVisibleCells();
-  //addErrors(altCellList);
 }
 
 async function attachContentChangedListener(notebookContent: Notebook, altCellList: AltCellList, cell: Cell, isEnabled: () => boolean, myPath: string) {
@@ -398,7 +397,7 @@ async function attachContentChangedListener(notebookContent: Notebook, altCellLi
     const codeCellHasTransparency = await checkCodeCellForImageWithAccessIssues(cell, myPath);
     var issues = mdCellIssues.concat(codeCellHasTransparency);
     applyVisualIndicator(altCellList, cell, issues);
-    addErrors(altCellList);
+    //addErrors(altCellList);
   });  
 }
 
@@ -421,32 +420,33 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   let applyIndic = false;
 
   for (let i = 0; i < listIssues.length; i++) {
+    const element = document.createElement("div");
     //cases for all 4 types of errors
     if (listIssues[i].slice(0,7) == "heading") { //heading h1 h1
       //altCellList.addCell(cell.model.id, "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
-      altCellList._errorCategoryMap.get("Header Errors")?.add(cell.model.id + "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10));
+      altCellList._errorCategoryMap.get("Header Errors")?.set(cell.model.id + "Heading format: expecting " + listIssues[i].slice(11, 13) + ", got " + listIssues[i].slice(8, 10), element);
       applyIndic = true;
     } else if(listIssues[i].split(" ")[1] == "contrast"){
       var score = Number(listIssues[i].split(" ")[0]);
       if (score < 4.5) {
         //altCellList.addCell(cell.model.id, "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
-        altCellList._errorCategoryMap.get("Contrast Errors")?.add(cell.model.id + "Cell Error: Text Contrast " + listIssues[i].split(" ")[2]);
+        altCellList._errorCategoryMap.get("Contrast Errors")?.set(cell.model.id + "Cell Error: Text Contrast " + listIssues[i].split(" ")[2], element);
         applyIndic = true;
       }
     } else if (listIssues[i] == "Alt") {
       //altCellList.addCell(cell.model.id, "Cell Error: Missing Alt Tag");
-      altCellList._errorCategoryMap.get("Alt Text Errors")?.add(cell.model.id + "Cell Error: Missing Alt Tag");
+      altCellList._errorCategoryMap.get("Alt Text Errors")?.set(cell.model.id + "Cell Error: Missing Alt Tag", element);
       applyIndic = true;
     } else if (listIssues[i] == "h1 header") {
       //altCellList.addCell(cell.model.id, "Header format: Missing h1 Header");
-      altCellList._errorCategoryMap.get("Header Errors")?.add(cell.model.id + "Header format: Missing h1 header");
+      altCellList._errorCategoryMap.get("Header Errors")?.set(cell.model.id + "Header format: Missing h1 header", element);
       applyIndic = true;
     } 
     else {
       var score = Number(listIssues[i].split(" ")[0]);
       if (score < 9) {
         //altCellList.addCell(cell.model.id, "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
-        altCellList._errorCategoryMap.get("Transparency Errors")?.add(cell.model.id + "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)");
+        altCellList._errorCategoryMap.get("Transparency Errors")?.set(cell.model.id + "Image Err: High Image Transparency (" + ((10-score)*10).toFixed(2) + "%)", element);
         applyIndic = true;
       }
     }
@@ -476,21 +476,22 @@ function applyVisualIndicator(altCellList: AltCellList, cell: Cell, listIssues: 
   // altCellList.showOnlyVisibleCells();
 }
 
-function addErrors(altCellList: AltCellList) {
-  altCellList._errorCategoryMap.forEach((errorsSet, section) => {
-    //console.log(`Category: ${section}`);
-    if (errorsSet.size > 0) {
-      altCellList.addSection(section);
-      errorsSet.forEach(error => {
-        console.log("ERROS SER");
-        console.log(errorsSet);
-          //console.log(`  - ${section}`);
-          //console.log(error.slice(36));
-          altCellList.addCell(error.slice(0, 36), error.slice(36));
-      });
-    }
+async function addErrors(altCellList: AltCellList) {
+  for (let [sectionName, errorsMap] of altCellList._errorCategoryMap.entries()) {
+    let size = errorsMap.size || 0;
 
-  });
+    //render the section first
+    if (size > 0) {
+      await altCellList.addSection(sectionName); 
+
+      // errors under a section/category type
+      if (errorsMap.size > 0) {
+        errorsMap.forEach((errorHTML, cellId) => {
+          altCellList.addCell(cellId.slice(0, 36), cellId.slice(36)); // Takes in cell ID, button content
+        });
+      }
+    }
+  }
   console.log("Category Map");
   console.log(altCellList._errorCategoryMap);
 }
@@ -599,13 +600,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
 //html styling/logic for rendering the side bar
 class AltCellList extends Widget {
   
-  private _listCells: HTMLElement;
-  private _cellMap: Map<string, HTMLElement[]>;
+  private _listCells: HTMLElement; //use a set?
+  private _cellMap: Map<string, HTMLElement[]>; //key is cell ID, key is the HTMLElement itself
   private _notebookTracker: INotebookTracker;
 
   // add sections for grouping buttons to make side bar UI nicer
   //_errorCategoryMap: Map<string, Map<string, HTMLElement[]>> = new Map();
-  _errorCategoryMap: Map<string, Set<string>> = new Map();
+  _errorCategoryMap: Map<string, Map<string, HTMLElement>> = new Map(); //key is the error category (string), Map<key is cell ID, HTML itself>
 
   constructor(notebookTracker: INotebookTracker) {
     super();
@@ -619,10 +620,10 @@ class AltCellList extends Widget {
     this._listCells.style.paddingRight = '10px'; 
 
     // initialize error groups
-    this._errorCategoryMap.set("Header Errors", new Set());
-    this._errorCategoryMap.set("Alt Text Errors", new Set());
-    this._errorCategoryMap.set("Contrast Errors", new Set());
-    this._errorCategoryMap.set("Transparency Errors", new Set());
+    this._errorCategoryMap.set("Header Errors", new Map());
+    this._errorCategoryMap.set("Alt Text Errors", new Map());
+    this._errorCategoryMap.set("Contrast Errors", new Map());
+    this._errorCategoryMap.set("Transparency Errors", new Map());
 
     let title = document.createElement('h2');
     title.innerHTML = "Cells with Accessibility Issues";
@@ -707,8 +708,7 @@ class AltCellList extends Widget {
 
     this.node.appendChild(title);
     this.node.appendChild(this._listCells);
-    //console.log("List Cells");
-    //console.log(this._listCells);
+
   }
 
   addSection(sectionName: string): void {
@@ -723,29 +723,49 @@ class AltCellList extends Widget {
     // Add header and apply button to the sidebar
     errorSection.appendChild(h1Header);
 
-    //errorSection.appendChild(applyButton);
+    const applyAllButton = document.createElement('button');
+    applyAllButton.textContent = "Apply All";
+    applyAllButton.style.backgroundColor = '#4CAF50';
+    applyAllButton.style.color = 'black';
+    applyAllButton.style.borderRadius = '3px';
+    applyAllButton.style.cursor = 'pointer';
+    applyAllButton.style.border = '1px solid black';
 
-    var add = true;
-    //check if this error already exists in the running map, if so do not add it
-    if (this._cellMap.has(sectionName)){
-      //cross check with categorymap, put what is in categorymap into cellmap
-      //var newList = this._errorCategoryMap.get(sectionName);
+    //applyAllButton.style.marginTop = '10px';
+    applyAllButton.style.marginLeft = '20px';
 
-      //remove duplicates
-      this._cellMap.set(sectionName, [...new Set((this._cellMap.get(sectionName)) || [])]);
-      add = false;
-      
 
-      //existingList!.push(errorSection);
-    } else {
-      this._cellMap.set(sectionName, [errorSection]);
+    errorSection.appendChild(applyAllButton);
+
+
+    const horizontalDivider = document.createElement('div');
+
+    // Apply styles to make it a thin grey line
+    horizontalDivider.style.width = '90%';
+    horizontalDivider.style.height = '1px';
+    horizontalDivider.style.backgroundColor = 'grey';
+    //horizontalDivider.style.margin = '10px 0';
+    horizontalDivider.style.marginLeft = '20px';
+    horizontalDivider.style.marginRight = '30px';
+    horizontalDivider.style.marginTop = '10px';
+    horizontalDivider.style.marginBottom = '10px';
+
+
+    errorSection.appendChild(horizontalDivider);
+    
+
+    let childrenDivs = this._listCells.children;
+    let add = true;
+    for (let cell of childrenDivs) {
+      if (cell.id === errorSection.id) {
+        add = false; //cell already rendered, don't render again
+      }
     }
-
     if (add) {
       this._listCells.appendChild(errorSection);
+
     }
 
-    // Append the section to the sidebar
   }
 
 
@@ -770,64 +790,6 @@ class AltCellList extends Widget {
     button.style.marginLeft = '7px';
     button.style.flexShrink = '1';
     button.textContent = buttonContent;
-    
-    button.addEventListener('click', () => {
-      this.scrollToCell(cellId);
-    });
-
-
-    //more information icon
-    const infoIcon = document.createElement('span');
-    infoIcon.innerHTML = '&#9432;';
-    infoIcon.style.cursor = 'pointer';
-    infoIcon.style.marginRight = '5px';
-
-
-
-    // Create a container div for the input and apply button
-    const container = document.createElement('div');
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.gap = '10px';
-    container.style.marginTop = '10px';
-
-    // Create a text input field to enter header name
-    const inputField = document.createElement('input');
-    inputField.type = 'text';
-    inputField.placeholder = 'Enter header text';
-    inputField.style.width = '100%';
-    inputField.style.padding = '5px';
-    inputField.style.border = '1px solid #ccc';
-    inputField.style.borderRadius = '2px';
-
-
-    // Add the input field to the container
-    container.appendChild(inputField);
-
-    //apply button for h1 headers
-    const applyButton = document.createElement('button');
-    applyButton.textContent = "Add h1 Header";
-    applyButton.style.backgroundColor = '#4CAF50';  
-    applyButton.style.color = 'black';
-    applyButton.style.border = 'none';
-    applyButton.style.padding = '5px 5px';
-    applyButton.style.cursor = 'pointer';
-    applyButton.style.marginTop = '5px';
-
-    // attach apply button logic: Create an <h1> tag when clicked
-    applyButton.addEventListener('click', () => {
-      const inputText = inputField.value.trim(); // Get the text input value
-      if (inputText) {
-        this.addMissingH1HeaderMarkdownCell(inputText); // Add the markdown cell with the user text
-        inputField.value = ''; // Clear the input field after applying
-      } else {
-        alert('Please enter header text.'); // Alert if input is empty
-      }
-
-    });
-
-    container.appendChild(applyButton);
-
 
     //dropdown box
     const dropdown = document.createElement('div');
@@ -860,65 +822,239 @@ class AltCellList extends Widget {
       link.textContent = "WCAG headings guidelines";
       summaryText.textContent = "Your header structure does not adhere to WCAG guidelines for page organization. Properly structured headers are essential for communicating content hierarchy and enabling assistive technologies, like screen readers, to navigate efficiently. Improving this ensures your work is accessible to the widest possible audience."
     }
+    
+    button.addEventListener('click', () => {
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+      //this.scrollToCell(cellId);
+    });
+
+
+    //more information icon
+    /*const infoIcon = document.createElement('span');
+    infoIcon.innerHTML = '&#9432;';
+    infoIcon.style.cursor = 'pointer';
+    infoIcon.style.marginRight = '5px';*/
+
+
+
+    // Create a container div for the input and apply button
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.flexDirection = 'row';
+    container.style.gap = '10px';
+    container.style.marginTop = '10px';
+
+    // Create a text input field to enter header name
+    const inputField = document.createElement('input');
+    inputField.type = 'text';
+    inputField.placeholder = 'Enter header text';
+    inputField.style.width = '100%';
+    inputField.style.padding = '5px';
+    inputField.style.border = '1px solid #ccc';
+    inputField.style.borderRadius = '2px';
+
+
+    // Add the input field to the container
+    container.appendChild(inputField);
+
+    //apply button for h1 headers
+    const applyButton = document.createElement('button');
+    applyButton.textContent = "Add h1 Header";
+    applyButton.style.backgroundColor = '#4CAF50';  
+    applyButton.style.color = 'black';
+    applyButton.style.border = 'none';
+    applyButton.style.padding = '2px 2px';
+    applyButton.style.cursor = 'pointer';
+    applyButton.style.marginTop = '2px';
+
+    // attach apply button logic: Create an <h1> tag when clicked
+    applyButton.addEventListener('click', () => {
+      const inputText = inputField.value.trim(); // Get the text input value
+      if (inputText) {
+        this.addMissingH1HeaderMarkdownCell(inputText); // Add the markdown cell with the user text
+        inputField.value = ''; // Clear the input field after applying
+      } else {
+        alert('Please enter header text.'); // Alert if input is empty
+      }
+
+    });
+
+    container.appendChild(applyButton);
+
+
+
 
     link.style.color = "#069";
     link.style.textDecoration = "underline";
     
     link.target = "_blank";
+
+
+
+    // Create a container div for the input and apply button
+    const applyContainer = document.createElement('div');
+    applyContainer.style.display = 'flex';
+    applyContainer.style.flexDirection = 'row';
+    applyContainer.style.gap = '2px';
+    applyContainer.style.marginTop = '2px';
+    
+
+    const apply = document.createElement('button');
+    apply.textContent = "Apply";
+    apply.style.backgroundColor = '#4CAF50';  
+    apply.style.color = 'black';
+    apply.style.border = '1px solid black';
+    apply.style.borderRadius = '3px';
+    apply.style.cursor = 'pointer';
+    apply.style.padding = '2px 2px';
+    apply.style.marginTop = '2px';
+    apply.style.width = '40px';
+
+    applyContainer.appendChild(apply);
+
+    const locate = document.createElement('button');
+    locate.textContent = "Locate";
+    locate.style.backgroundColor = '#F5ABAB';  
+    locate.style.color = 'black';
+    locate.style.border = '1px solid black';
+    locate.style.borderRadius = '3px';
+    locate.style.cursor = 'pointer';
+    locate.style.padding = '2px 2px';
+    locate.style.marginTop = '2px';
+    locate.style.width = '45px';
+
+    locate.addEventListener('click', () => {
+      this.scrollToCell(cellId);
+    });
+
+    applyContainer.appendChild(locate);
+
+    dropdown.appendChild(applyContainer);
     dropdown.appendChild(summaryText);
     dropdown.appendChild(link);
 
     // Toggle dropdown on info icon click
-    infoIcon.addEventListener('click', () => {
+    /*infoIcon.addEventListener('click', () => {
         dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-    });
+    });*/
 
     var add = true;
     //check if this error already exists in the running map, if so do not add it
-    if (this._cellMap.has(cellId)){
-      var existingList = this._cellMap.get(cellId)
-      existingList!.forEach(b => {          
-        if (b.textContent == buttonContent) {
-          add = false;
-        }
+    this._errorCategoryMap.forEach((cellMap, errorSectionName) => {
+      cellMap.forEach((errorHTML, cellID) => {
+          if (errorHTML.textContent === buttonContent) {
+            add = false;
+
+          }
+
+        })
       })
+      
 
-      const cellElements = this._cellMap.get(cellId) ?? [];
-      let isDuplicate = false;
-
-      // itearte through each element in the array
-      for (const el of cellElements) {
-        if (el.id == listItemWrapper.id) {
-          isDuplicate = true;
-          break; // stop early if a match is found
-        }
-      }
-      console.log(isDuplicate ? "Duplicate found!" : "No duplicate.");
-      //if no duplicate, then add to cellmap
-      if (isDuplicate) {
-        console.log(listItemWrapper);
-      }
-      else {
-        existingList!.push(listItemWrapper);
-        this._cellMap.set(cellId, existingList!);
-      }
-    } else { //error doesn't already exist
-      this._cellMap.set(cellId, [listItemWrapper]);
-    }
 
     if (add) {
       listItem.appendChild(button);
       if (buttonContent.includes("h1 header")){
         listItem.appendChild(container);
       } else{
-        listItem.appendChild(infoIcon);
+        //listItem.appendChild(infoIcon);
       }
       listItemWrapper.appendChild(listItem)
       listItemWrapper.appendChild(dropdown);
-      this._listCells.appendChild(listItemWrapper);
+      //if (this._listCells.contains(listItemWrapper.id))
+      //check to see if listItemwrapper already in listCells
+      let childrenDivs = this._listCells.children;
+      let add = true;
+      for (let cell of childrenDivs) {
+        if (cell.id === listItemWrapper.id) {
+          add = false; //cell already rendered, don't render again
+        }
+      }
+      if (add) {
+        this._listCells.appendChild(listItemWrapper);
+        //add to category map?
 
+        //list item Wrapper
+        console.log("LIST ite warpper");
+        console.log(listItemWrapper);
+        console.log(listItemWrapper.id.slice(5));
+
+        let mapId = cellId + buttonContent;
+        if (buttonContent.includes("Transparency")){
+          //let htmlElement = this._errorCategoryMap.get("Transparency Errors")?.get(listItemWrapper.id.slice(5))?.appendChild(listItemWrapper);
+          const innerMap = this._errorCategoryMap.get("Transparency Errors")!;
+
+          // If the key already exists, replace the HTMLElement
+          /*if (innerMap.has(mapId)) {
+            const oldElement = innerMap.get(mapId);
+            if (oldElement && oldElement.parentNode) {
+              oldElement.parentNode.replaceChild(listItemWrapper, oldElement);
+            }
+          }*/
+          // Update the inner map with the new div
+          requestIdleCallback(() => {
+            innerMap.set(mapId, listItemWrapper);
+          });          //this._errorCategoryMap.get("Transparency Errors")?.set(listItemWrapper.id.slice(5), htmlElement);
+        } else if(buttonContent.includes("Heading")){
+          const innerMap = this._errorCategoryMap.get("Header Errors")!;
+
+          // If the key already exists, replace the HTMLElement
+          /*if (innerMap.has(listItemWrapper.id.slice(5))) {
+            const oldElement = innerMap.get(listItemWrapper.id.slice(5));
+            if (oldElement && oldElement.parentNode) {
+              oldElement.parentNode.replaceChild(listItemWrapper, oldElement);
+            }
+          }*/
+          // Update the inner map with the new div
+          requestIdleCallback(() => {
+            innerMap.set(mapId, listItemWrapper);
+          });          //this._errorCategoryMap.get("Header Errors")?.get(listItemWrapper.id.slice(5))?.appendChild(listItemWrapper);
+        } else if(buttonContent.includes("Alt")){
+          const innerMap = this._errorCategoryMap.get("Alt Text Errors")!;
+
+          // If the key already exists, replace the HTMLElement
+          /*if (innerMap.has(listItemWrapper.id.slice(5))) {
+            const oldElement = innerMap.get(listItemWrapper.id.slice(5));
+            if (oldElement && oldElement.parentNode) {
+              oldElement.parentNode.replaceChild(listItemWrapper, oldElement);
+            }
+          }*/
+          // Update the inner map with the new div
+          requestIdleCallback(() => {
+            innerMap.set(mapId, listItemWrapper);
+          });          //this._errorCategoryMap.get("Alt Text Errors")?.get(listItemWrapper.id.slice(5))?.appendChild(listItemWrapper);
+        } else if(buttonContent.includes("Contrast")){
+          const innerMap = this._errorCategoryMap.get("Contrast Errors")!;
+
+          // If the key already exists, replace the HTMLElement
+          /*if (innerMap.has(listItemWrapper.id.slice(5))) {
+            const oldElement = innerMap.get(listItemWrapper.id.slice(5));
+            if (oldElement && oldElement.parentNode) {
+              oldElement.parentNode.replaceChild(listItemWrapper, oldElement);
+            }
+          }*/
+          // Update the inner map with the new div
+          requestIdleCallback(() => {
+            innerMap.set(mapId, listItemWrapper);
+          });          //this._errorCategoryMap.get("Contrast Errors")?.get(listItemWrapper.id.slice(5))?.appendChild(listItemWrapper);
+        } else if(buttonContent.includes("h1 header")){
+          const innerMap = this._errorCategoryMap.get("Header Errors")!;
+
+          // If the key already exists, replace the HTMLElement
+          /*if (innerMap.has(listItemWrapper.id.slice(5))) {
+            const oldElement = innerMap.get(listItemWrapper.id.slice(5));
+            if (oldElement && oldElement.parentNode) {
+              oldElement.parentNode.replaceChild(listItemWrapper, oldElement);
+            }
+          }*/
+          // Update the inner map with the new div
+          requestIdleCallback(() => {
+            innerMap.set(mapId, listItemWrapper);
+          });
+         //this._errorCategoryMap.get("Header Errors")?.get(listItemWrapper.id.slice(5))?.appendChild(listItemWrapper);
+        }
+      }
     }
-
 
 
     // this.showOnlyVisibleCells();
@@ -973,6 +1109,19 @@ class AltCellList extends Widget {
 
   }
 
+  removeFromRender(cellId: string): void {
+    //let HTMLel = null;
+    this._errorCategoryMap.forEach((sectionMap) => {
+      let cell = sectionMap.get(cellId.slice(5));
+      console.log("slice cell id");
+      console.log(cellId);
+      if (typeof cell !== "undefined") { //cell doesn't exist, which should not happen
+        //removechild on list cells
+      }
+
+    });
+  }
+
   //scroll to cell once clicked
   scrollToCell(cellId: string): void {
     const notebookPanel = this._notebookTracker.currentWidget;
@@ -999,28 +1148,26 @@ class AltCellList extends Widget {
   // are visible ONLY in the currently opened jupyterlab notebook
   showOnlyVisibleCells(): void {
     console.log("showing only visible cells");
-    var keyList = Array.from(this._cellMap.keys());
+    //var keyList = Array.from(this._cellMap.keys()); //id and html code
     console.log("CELL MAP");
     console.log(this._cellMap);
-    console.log(this._cellMap instanceof Map); // Should be `true`
-    console.log(this._cellMap.keys()); // Should log an iterable object
+    //console.log(this._cellMap instanceof Map); // Should be `true`
+    //console.log(this._cellMap.keys()); // Should log an iterable object
 
     const notebookPanel = this._notebookTracker.currentWidget;
     const notebook = notebookPanel!.content;
-    //console.log("NOTEBOOK");
-    //console.log(notebook.widgets);
+    console.log("WIDGET", notebook.widgets[0]);
+    console.log("LIST CELLS", this._listCells);
 
     // iterate through all cells in cellMap, which contains all the accumulated errors
-    setTimeout(() => {
-      console.log("Delayed Keys:", Array.from(this._cellMap.keys()));
+    /*setTimeout(() => {
       keyList = Array.from(this._cellMap.keys());
-      keyList.forEach(k => {
+      keyList.forEach(k => { //cellId
         var cellExists = false;
         for (let i = 0; i < notebook.widgets.length; i++) {
           const cell = notebook.widgets[i];
           // check to see if the error associated with a particular cell is currently in the notebook
           if (cell.model.id === k) {
-            console.log("REEEEE");
             console.log(k);
             cellExists = true;
             break
@@ -1033,9 +1180,62 @@ class AltCellList extends Widget {
         }
       });  
 
-    }, 5000); // Wait for data to populate
+    }, 5000); // Wait for data to populate */
     
-    axe.run(document.body)
+
+
+
+
+
+    let exists = false;
+    setTimeout(() => {
+      console.log("LIST CELLS CHILDREN", this._listCells.children);
+
+      let children = this._listCells.children;
+      for (let item of children) {
+        for (let i = 0; i < notebook.widgets.length; i++) {
+          let cell = notebook.widgets[i];
+          console.log("item");
+          console.log(item);
+          console.log("cell");
+          console.log(cell.model.id);
+
+          if (item.id.includes(cell.model.id)) { //cell.model.id will be substring of item.id, notebook widgets have curr active cells
+            exists = true; //cell does exist so no need to remove
+            break;
+          }
+
+        }
+        //if the current cell in listCells (which is everything that gets rendered) isn't in curr opened notebook, then remove it
+        if (!exists) {
+          //remove from listcells
+          this.removeFromRender(item.id); //id of cell to remove from listcells
+  
+          //do we need to remove from errorCategoryMap too?
+        }
+
+      }
+      axe.run(document.body)
+      .then(results => {
+        if (results.violations.length) {
+          console.error('Accessibility issues found:', results.violations);
+          let resultDiv = document.createElement("div");
+          resultDiv.textContent = results.violations;
+          this._listCells.appendChild(results.violations)
+        } else {
+          console.log('No accessibility issues found.');
+        }
+      })
+      .catch(err => {
+        console.error('Something bad happened:', err.message);
+      });
+
+    }, 5000);
+    
+    
+    
+    
+    /*axe.run(document.body)
       .then(results => {
         if (results.violations.length) {
           console.error('Accessibility issues found:', results.violations);
@@ -1045,7 +1245,7 @@ class AltCellList extends Widget {
       })
       .catch(err => {
         console.error('Something bad happened:', err.message);
-      });
+      });*/
 
   }
 
